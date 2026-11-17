@@ -1,51 +1,48 @@
-# Public-PH — Runner CI pubblico di PLUS HUB 2.0
+# Public-PH — CI pubblica per PLUS HUB 2.0
 
-Questo repository contiene **solo workflow e istruzioni CI**, non codice proprietario, file aziendali, database, PDF, dati degli ospiti o informazioni HR.
+Repository dedicato ai **runner GitHub Actions pubblici**. I sorgenti dei tre applicativi rimangono privati. Non committare codice proprietario, dati ospiti, documenti HR, PDF, credenziali o output riservati.
 
-Gli applicativi e i test restano nei repository privati. I job pubblici fanno checkout su commit SHA esatti, con token di sola lettura, disabilitano la persistenza delle credenziali Git e non caricano artifact o log sorgente.
+## Workflow e risultati verificati — 17 novembre 2026
 
-## Workflow disponibili
-
-| Workflow | Controllo | Stato effettivamente verificato |
+| Workflow | Verifica | Evidenza reale |
 |---|---|---|
-| [Fixture sintetiche](.github/workflows/plus-hub-fixtures.yml) | `PLUS-HUB` PR #50, schema delle fixture | **PASS**: [run 44177186028](https://github.com/Sidious92/Public-PH/actions/runs/44177186028) |
-| [Scaffold e import boundaries](.github/workflows/plus-hub-architecture.yml) | `PLUS-HUB` PR #47, test architetturali | **PASS**: [run 44177393214](https://github.com/Sidious92/Public-PH/actions/runs/44177393214) |
-| [Motori legacy](.github/workflows/plus-hub-legacy-engines.yml) | Esecuzione effettiva del source legacy di Report e Planner | **BLOCCATO dai permessi**: [run 44178323845](https://github.com/Sidious92/Public-PH/actions/runs/44178323845) |
+| [Fixture Shift Report](.github/workflows/plus-hub-fixtures.yml) | struttura delle fixture sintetiche della PR #50 | **PASS** — [run 44177186028](https://github.com/Sidious92/Public-PH/actions/runs/44177186028) |
+| [Architettura PLUS HUB](.github/workflows/plus-hub-architecture.yml) | suite dei confini architetturali dello scaffold PR #47 | **PASS** — [run 44177393214](https://github.com/Sidious92/Public-PH/actions/runs/44177393214) |
+| [Motori legacy](.github/workflows/plus-hub-legacy-engines.yml) | source effettivo di Shift Report e tre suite Node Shift Planner | **PASS, entrambi i job** — [run 44183858636](https://github.com/Sidious92/Public-PH/actions/runs/44183858636) |
 
-Il PASS su fixture o scaffold **non** significa parità funzionale, sicurezza in produzione o GO alla migrazione.
+Il PASS dei motori legacy dimostra **solo i test selezionati sui commit specifici**. Non dimostra equivalenza fra sistemi, sicurezza in produzione, versioni effettivamente distribuite sui PC, PDF visuali o conformità di tutti i gate G0–G8.
 
-## Secret e permessi
+## Mappa dei secret — permessi minimi
 
-Il repository ha già il secret GitHub Actions **`PUBLIC_PH_READ_TOKEN`**, che ha consentito di leggere `Sidious92/PLUS-HUB`. Il suo valore non deve essere copiato nei file, nella chat, nelle issue o nei log pubblici.
+Tutti sono **Repository Secrets** di `Sidious92/Public-PH`, usati dai job su GitHub-hosted public runner. I valori non sono leggibili o pubblicati.
 
-Il nuovo workflow di caratterizzazione dei motori ha provato ad accedere a due ulteriori repository e ha ottenuto **HTTP 403** su entrambi. Pertanto, per usare la CI centralizzata, il fine-grained PAT referenziato dal secret deve avere:
+| Repository sorgente privato | Nome esatto del secret | Permesso |
+|---|---|---|
+| `Sidious92/PLUS-HUB` | `PUBLIC_PH_READ_TOKEN` | Contents: Read-only |
+| `Sidious92/Shift-Report-New` | `PUBLIC_PH_X_SHIFT_REPORT_TOKEN` | Contents: Read-only |
+| `Sidious92/Shift-Planner` | `PUBLIC_PH_X_SHIFT_PLANNER_TOKEN` | Contents: Read-only |
 
-- **Repository access:** esattamente `Sidious92/PLUS-HUB`, `Sidious92/Shift-Report-New`, `Sidious92/Shift-Planner`.
-- **Repository permissions:** `Contents: Read-only` (e permessi Metadata predefiniti).
-- Nessun permesso Actions Write, Administration, Secrets, Pull Requests Write o accesso agli altri repository.
+**Non sostituire** i tre riferimenti con un token di accesso globale. Non copiare i valori dei secret in chat, Git, job log, issue, artifact o cache.
 
-Se il PAT è modificabile, aggiorna l'elenco dei repository selezionati nel pannello GitHub del token. Se viene rigenerato con un valore differente, **aggiorna il valore** del secret `PUBLIC_PH_READ_TOKEN` in [Public-PH Actions Secrets](https://github.com/Sidious92/Public-PH/settings/secrets/actions). Non creare un token classic con accesso globale solo per questa CI.
+## Come eseguire il test dei motori
 
-Questa verifica riguarda **i permessi di checkout**, non è un errore del codice del dominio.
+1. Apri [GitHub Actions di Public-PH](https://github.com/Sidious92/Public-PH/actions).
+2. Seleziona **PLUS HUB - Legacy domain engine characterization**.
+3. Premi **Run workflow** da `main`.
+4. Verifica separatamente i due job:
+   - **Shift Report:** `Shift-Report-New@777bb52eecea605ef8dcbba491e2f20d85898663` con `PLUS-HUB@8d9734024585e286646c2389adc04b49262cd6c9` per il probe sintetico: date operative, checklist, eventi Notte, pacchi.
+   - **Shift Planner:** `Shift-Planner@ccf723a6bbc8421c8bf6eb77466313b48c52539a`; tre suite Node selezionate (suite canonica, request-week reconciler, administrative illness reversal).
+5. Il workflow registra PASS/FAIL generici per evitare la diffusione di output privati nel repository pubblico.
 
-## Avvio manuale dopo la correzione
+L'esecuzione del **17/11/2026** ha superato verifica dei tre token, checkout dei commit e i test selezionati. I sorgenti originali non vengono copiati nel repository pubblico e non sono caricati artifact.
 
-1. Apri [Actions di Public-PH](https://github.com/Sidious92/Public-PH/actions).
-2. Scegli **PLUS HUB - Legacy domain engine characterization**.
-3. Premi **Run workflow** dal branch `main`.
-4. Controlla separatamente i due job:
-   - **Shift Report:** checkout dello SHA `777bb52eecea605ef8dcbba491e2f20d85898663`, esecuzione del `probe-legacy.mjs` presente in `PLUS-HUB` allo SHA `8d9734024585e286646c2389adc04b49262cd6c9` su moduli originali di data operativa, checklist, codec Notte e pacchi.
-   - **Shift Planner:** checkout dello SHA `ccf723a6bbc8421c8bf6eb77466313b48c52539a`, esecuzione di tre suite Node originali su modello/validatori, richieste settimanali e annullamento amministrativo delle assenze.
-5. L'esito viene riportato con un messaggio generico. Nessun file, stack trace o output privato viene caricato come artifact.
+## Misure di sicurezza e limitazioni
 
-**Stato:** i due job hanno potuto inizializzarsi sul runner pubblico, ma il primo test di checkout legacy è stato negato con `403`. **Nessun test dei motori originali è stato eseguito tramite questo workflow.**
+- **Trigger manuale soltanto**: niente workflow avviati da PR esterne, `pull_request_target` o input di codice arbitrario.
+- Checkout su commit SHA fissati e `persist-credentials: false`; nessun upload artifact/log di test.
+- Ai job con token privati possono contribuire soltanto manutentori fidati: la sicurezza dei token dipende anche dalla protezione del branch `main` e dalla revisione dei workflow.
+- Questi test possono usare codice proveniente dai repository privati: verificare le modifiche ai commit fissati prima di cambiare gli SHA. Nessun test deve contenere dati reali o stampare informazioni sensibili.
+- I workflow di Report e Planner sono **test di caratterizzazione e regressione del legacy**, non una migrazione della logica nel backend di PLUS HUB.
+- Restano aperti: mappatura della release usata in struttura, estrazione controllata dei motori, parity test sul target, autorizzazioni BFF e per-record, concorrenza e restore.
 
-## Limiti e sicurezza
-
-- Solo avvio manuale: niente trigger da PR pubbliche e niente `pull_request_target`.
-- Il workflow usa SHA di sorgente **fissati nel file YAML**, non branch privati o ref arbitrari forniti dagli utenti. Per aggiornare le baseline serve una modifica revisionata del workflow.
-- I file di lavoro rimangono sul runner temporaneo e non vengono pubblicati; ogni step di esecuzione dei test ha un output generico.
-- Un repository pubblico che può leggere codice privato richiede amministrazione prudente: solo persone fidate devono poter modificare workflow e lanciare test, senza consentire PR non attendibili a job con secret.
-- CI green su moduli legacy ≠ equivalenza di PLUS HUB 2.0. Servono ancora confronto con versione installata, test BFF, autorizzazione, concorrenza, PDF e backup/restore.
-
-**Decisione architetturale:** mantenere motori sorgente privati e riusarli solo dopo caratterizzazione; niente copia indiscriminata di UI, database OneDrive, identità locale o parti di applicazione dipendenti dal DOM.
+**Direzione approvata:** motori legacy riutilizzabili, mantenendo separati Core, BFF, DB e criteri di autorizzazione della piattaforma nuova.
