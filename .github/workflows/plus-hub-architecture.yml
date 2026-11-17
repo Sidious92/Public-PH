@@ -1,0 +1,95 @@
+name: PLUS HUB - Architecture scaffold checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Trusted exact commit SHA from PLUS-HUB scaffold branch"
+        required: true
+        type: string
+        default: "4ce5a03e46daa570eb8fd30cc4130db2665c6da4"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ph-architecture-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  architectural-boundaries:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    name: Scaffold structure and import boundaries (NOT security certification)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check SHA and private token configuration
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          TOKEN_PRESENT: ${{ secrets.PLUS_HUB_READ_TOKEN != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Invalid commit SHA."
+            exit 1
+          fi
+          if [[ "$TOKEN_PRESENT" != "true" ]]; then
+            echo "Missing PLUS_HUB_READ_TOKEN repository secret."
+            exit 1
+          fi
+
+      - name: Checkout only the approved scaffold folders
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: ${{ inputs.source_sha }}
+          token: ${{ secrets.PLUS_HUB_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            apps
+            packages
+            modules
+            db
+            tests/architecture
+            tools/architecture
+          sparse-checkout-cone-mode: true
+          path: private-src
+
+      - name: Install Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Validate the exact revision and test entrypoint
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(git -C private-src rev-parse HEAD)"
+          if [[ "$actual_sha" != "$SOURCE_SHA" ]]; then
+            echo "Private checkout source commit does not match the requested SHA."
+            exit 1
+          fi
+          test -f private-src/package.json
+          test -f private-src/tests/architecture/import-boundaries.test.mjs
+          test -f private-src/tests/architecture/workspaces.test.mjs
+          echo "Pinned source revision and expected architecture tests verified."
+
+      - name: Run approved architecture tests without publishing source details
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm test) > "$RUNNER_TEMP/architecture-results.log" 2>&1; then
+            echo "PASS: architectural scaffold tests (not production or runtime security)."
+          else
+            echo "FAIL: architectural scaffold tests. Raw logs are intentionally not published."
+            exit 1
+          fi
+
+      # Public jobs must not upload private code, logs, dependencies, or artifacts.
