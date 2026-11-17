@@ -26,7 +26,7 @@ jobs:
       - name: Check SHA and private token configuration
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
-          TOKEN_PRESENT: ${{ secrets.PLUS_HUB_READ_TOKEN != '' }}
+          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -35,7 +35,7 @@ jobs:
             exit 1
           fi
           if [[ "$TOKEN_PRESENT" != "true" ]]; then
-            echo "Missing PLUS_HUB_READ_TOKEN repository secret."
+            echo "Missing PUBLIC_PH_READ_TOKEN repository secret."
             exit 1
           fi
 
@@ -44,7 +44,7 @@ jobs:
         with:
           repository: Sidious92/PLUS-HUB
           ref: ${{ inputs.source_sha }}
-          token: ${{ secrets.PLUS_HUB_READ_TOKEN }}
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
           lfs: false
