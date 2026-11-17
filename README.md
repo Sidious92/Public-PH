@@ -1,6 +1,6 @@
 # Public PH — CI pubblica per PLUS HUB 2.0
 
-Questo repository è un **runner CI pubblico**. I sorgenti applicativi restano nei repository privati `Sidious92/PLUS-HUB`, `Sidious92/Shift-Report-New` e `Sidious92/Shift-Planner`.
+Questo repository è un **runner CI pubblico**. I sorgenti applicativi restano nel repository privato `Sidious92/PLUS-HUB`; qui sono presenti solo configurazioni di esecuzione e istruzioni non riservate.
 
 ## Principio di sicurezza
 
@@ -27,7 +27,7 @@ Suite disponibile nella PR privata [PLUS-HUB #50](https://github.com/Sidious92/P
 
 SHA di esempio verificato: `8d9734024585e286646c2389adc04b49262cd6c9` (non garantisce che questo SHA rimanga il più recente).
 
-Il probe sul **codice originale** di Shift-Report-New richiederà un ulteriore accesso read-only al repository legacy e un workflow isolato; non è incluso in questo bootstrap.\n\n**Nota sulla riservatezza:** i workflow usano sparse checkout: scaricano solo le sottocartelle strettamente necessarie e non pubblicano artefatti, sorgenti o stack trace. Non passare un commit non revisionato a un job dotato di accesso ai repository privati.
+I test sui **repository legacy** richiederanno credenziali read-only distinte e workflow isolati; non sono inclusi in questo bootstrap.\n\n**Nota sulla riservatezza:** i workflow usano sparse checkout: scaricano solo le sottocartelle strettamente necessarie e non pubblicano artefatti, sorgenti o stack trace. Non passare un commit non revisionato a un job dotato di accesso ai repository privati.
 
 ## Limitazioni
 
