@@ -1,11 +1,6 @@
 name: PLUS HUB - Architecture scaffold checks
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-architecture.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -23,14 +18,14 @@ concurrency:
 
 jobs:
   architectural-boundaries:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     name: Scaffold structure and import boundaries (NOT security certification)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check SHA and private token configuration
         env:
-          SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || '4ce5a03e46daa570eb8fd30cc4130db2665c6da4' }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         shell: bash
         run: |
@@ -48,7 +43,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || '4ce5a03e46daa570eb8fd30cc4130db2665c6da4' }}
+          ref: ${{ inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -72,7 +67,7 @@ jobs:
 
       - name: Validate the exact revision and test entrypoint
         env:
-          SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || '4ce5a03e46daa570eb8fd30cc4130db2665c6da4' }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         shell: bash
         run: |
           set -euo pipefail
