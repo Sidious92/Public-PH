@@ -15,8 +15,10 @@ Questo repository è un **runner CI pubblico**. I sorgenti applicativi restano n
 1. Crea un **fine-grained personal access token** con accesso esclusivamente a `Sidious92/PLUS-HUB` e permesso **Contents: Read-only**.
 2. In questo repository pubblico, vai su **Settings → Secrets and variables → Actions → New repository secret**.
 3. Nome esatto del secret: **`PLUS_HUB_READ_TOKEN`**. Incolla il valore solo nel campo GitHub, non in chat o nei file.
-4. Apri **Actions → PLUS HUB — Synthetic fixture integrity → Run workflow** sul branch `main`, impostando il commit SHA di PLUS-HUB che vuoi verificare.
-5. Controlla il risultato. Un PASS dimostra soltanto **integrità delle fixture** sul commit selezionato.
+4. Apri **Actions** nel repository `Public-PH` e seleziona uno dei due workflow manuali sul branch `main`:
+   - **PLUS HUB - Synthetic fixture integrity**: usa lo SHA `8d9734024585e286646c2389adc04b49262cd6c9` (PR #50, salvo avanzamenti).
+   - **PLUS HUB - Architecture scaffold checks**: usa lo SHA `4ce5a03e46daa570eb8fd30cc4130db2665c6da4` (PR #47, salvo avanzamenti).
+5. Premi **Run workflow** e controlla l'esito. Il primo PASS prova solo l'integrità delle fixture; il secondo PASS prova solo i vincoli statici di scaffold e import.
 
 ## Stato iniziale
 
@@ -25,7 +27,7 @@ Suite disponibile nella PR privata [PLUS-HUB #50](https://github.com/Sidious92/P
 
 SHA di esempio verificato: `8d9734024585e286646c2389adc04b49262cd6c9` (non garantisce che questo SHA rimanga il più recente).
 
-Il probe sul **codice originale** di Shift-Report-New richiederà un ulteriore accesso read-only al repository legacy e un secondo workflow isolato; non è incluso in questo bootstrap.
+Il probe sul **codice originale** di Shift-Report-New richiederà un ulteriore accesso read-only al repository legacy e un workflow isolato; non è incluso in questo bootstrap.\n\n**Nota sulla riservatezza:** i workflow usano sparse checkout: scaricano solo le sottocartelle strettamente necessarie e non pubblicano artefatti, sorgenti o stack trace. Non passare un commit non revisionato a un job dotato di accesso ai repository privati.
 
 ## Limitazioni
 
