@@ -14,7 +14,7 @@ Questo repository è un **runner CI pubblico**. I sorgenti applicativi restano n
 
 1. Crea un **fine-grained personal access token** con accesso esclusivamente a `Sidious92/PLUS-HUB` e permesso **Contents: Read-only**.
 2. In questo repository pubblico, vai su **Settings → Secrets and variables → Actions → New repository secret**.
-3. Nome esatto del secret: **`PLUS_HUB_READ_TOKEN`**. Incolla il valore solo nel campo GitHub, non in chat o nei file.
+3. Nome esatto del secret: **`PUBLIC_PH_READ_TOKEN`**. Incolla il valore solo nel campo GitHub, non in chat o nei file.
 4. Apri **Actions** nel repository `Public-PH` e seleziona uno dei due workflow manuali sul branch `main`:
    - **PLUS HUB - Synthetic fixture integrity**: usa lo SHA `8d9734024585e286646c2389adc04b49262cd6c9` (PR #50, salvo avanzamenti).
    - **PLUS HUB - Architecture scaffold checks**: usa lo SHA `4ce5a03e46daa570eb8fd30cc4130db2665c6da4` (PR #47, salvo avanzamenti).
