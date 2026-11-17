@@ -1,0 +1,89 @@
+name: PLUS HUB - Synthetic fixture integrity
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Trusted 40-character commit SHA from private PLUS-HUB"
+        required: true
+        type: string
+        default: "8d9734024585e286646c2389adc04b49262cd6c9"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ph-fixtures-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fixture-integrity:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check configuration without printing credentials
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          TOKEN_PRESENT: ${{ secrets.PLUS_HUB_READ_TOKEN != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo "Invalid commit SHA. Use an exact lowercase 40-character SHA."
+            exit 1
+          fi
+          if [[ "$TOKEN_PRESENT" != "true" ]]; then
+            echo "Missing repository secret PLUS_HUB_READ_TOKEN in Public-PH."
+            exit 1
+          fi
+
+      - name: Checkout private PLUS-HUB (read-only, exact revision)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: ${{ inputs.source_sha }}
+          token: ${{ secrets.PLUS_HUB_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            verification/shift-report
+          sparse-checkout-cone-mode: true
+          path: private-src
+
+      - name: Install Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify source SHA and test entrypoint
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual_sha="$(git -C private-src rev-parse HEAD)"
+          if [[ "$actual_sha" != "$SOURCE_SHA" ]]; then
+            echo "Private checkout returned a different revision."
+            exit 1
+          fi
+          test -f private-src/verification/shift-report/fixture-integrity.test.mjs
+          echo "Pinned source revision verified."
+
+      - name: Run ONLY synthetic fixture structure checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Public workflow logs are visible to everyone: do not print
+          # private source, fixture contents, test stack traces or paths.
+          if node --test private-src/verification/shift-report/fixture-integrity.test.mjs > "$RUNNER_TEMP/fixture-test-output.txt" 2>&1; then
+            echo "PASS: synthetic fixture integrity checks."
+          else
+            echo "FAIL: synthetic fixture integrity checks. Raw output intentionally kept off public logs."
+            exit 1
+          fi
+
+      # No artifacts, source upload, cache, or logs containing private data.
