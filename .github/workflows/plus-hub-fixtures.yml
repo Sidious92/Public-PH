@@ -1,11 +1,6 @@
 name: PLUS HUB - Synthetic fixture integrity
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-fixtures.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -23,13 +18,13 @@ concurrency:
 
 jobs:
   fixture-integrity:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Check configuration without printing credentials
         env:
-          SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || '8d9734024585e286646c2389adc04b49262cd6c9' }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PLUS_HUB_READ_TOKEN != '' }}
         shell: bash
         run: |
@@ -47,7 +42,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || '8d9734024585e286646c2389adc04b49262cd6c9' }}
+          ref: ${{ inputs.source_sha }}
           token: ${{ secrets.PLUS_HUB_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -66,7 +61,7 @@ jobs:
 
       - name: Verify source SHA and test entrypoint
         env:
-          SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.source_sha || '8d9734024585e286646c2389adc04b49262cd6c9' }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         shell: bash
         run: |
           set -euo pipefail
