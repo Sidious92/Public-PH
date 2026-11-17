@@ -1,0 +1,149 @@
+name: PLUS HUB - Legacy domain engine characterization
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ph-legacy-domain-engines
+  cancel-in-progress: false
+
+jobs:
+  report-domain:
+    name: Shift Report - original domain code and synthetic probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check access secret presence
+        env:
+          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TOKEN_PRESENT" != true ]]; then
+            echo "FAIL: PUBLIC_PH_READ_TOKEN is not accessible."
+            exit 2
+          fi
+
+      - name: Checkout pinned PLUS HUB synthetic test harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: 8d9734024585e286646c2389adc04b49262cd6c9
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            verification/shift-report
+          sparse-checkout-cone-mode: true
+          path: harness
+
+      - name: Checkout pinned Shift Report domain modules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/Shift-Report-New
+          ref: 777bb52eecea605ef8dcbba491e2f20d85898663
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            src/native/config.js
+            src/domain/night-shift-codec.js
+            src/domain/packages/index.js
+            src/application/navigation/index.js
+          sparse-checkout-cone-mode: false
+          path: legacy-report
+
+      - name: Set up Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify source and execute original domain functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if node harness/verification/shift-report/probe-legacy.mjs legacy-report > "$RUNNER_TEMP/report-engine-test.log" 2>&1; then
+            echo "PASS: Shift Report original domain modules agree with pinned synthetic expected behavior."
+          else
+            echo "FAIL: Shift Report domain characterization; detailed source/test output withheld from public CI."
+            exit 1
+          fi
+
+  planner-domain:
+    name: Shift Planner - canonical model and validator regression suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check access secret presence
+        env:
+          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TOKEN_PRESENT" != true ]]; then
+            echo "FAIL: PUBLIC_PH_READ_TOKEN is not accessible."
+            exit 2
+          fi
+
+      - name: Checkout pinned Shift Planner source (read-only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/Shift-Planner
+          ref: ccf723a6bbc8421c8bf6eb77466313b48c52539a
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          path: legacy-planner
+
+      - name: Setup Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Validate commit and required suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C legacy-planner rev-parse HEAD)" = "ccf723a6bbc8421c8bf6eb77466313b48c52539a"
+          test -z "$(git -C legacy-planner status --porcelain --untracked-files=no)"
+          test -f legacy-planner/tests/test-runner.js
+          test -f legacy-planner/tests/request-week-reconciler-node-runner.js
+          test -f legacy-planner/tests/v2-5-administrative-illness-reversal-node-runner.js
+
+      - name: Run selected canonical Node tests on original Planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd legacy-planner
+          for test_file in \
+            tests/test-runner.js \
+            tests/request-week-reconciler-node-runner.js \
+            tests/v2-5-administrative-illness-reversal-node-runner.js
+          do
+            if node "$test_file" > "$RUNNER_TEMP/planner-engine-test.log" 2>&1; then
+              echo "PASS: selected Planner domain/regression suite."
+            else
+              echo "FAIL: selected Planner domain/regression suite. Raw output withheld from public logs."
+              exit 1
+            fi
+          done
+
+      - name: Ensure tests did not edit tracked source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C legacy-planner status --porcelain --untracked-files=no)"
+          echo "Tracked source unchanged."
+
+# No artifacts, no full private test output, no access to customer DB or OneDrive.
