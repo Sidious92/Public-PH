@@ -27,6 +27,17 @@ jobs:
             exit 2
           fi
 
+      - name: Verify read permission for Shift Report before checkout
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! gh api repos/Sidious92/Shift-Report-New --jq .full_name > /dev/null 2>&1; then
+            echo "FAIL: read token does not authorize the Shift Report source repository."
+            exit 3
+          fi
+
       - name: Checkout pinned PLUS HUB synthetic test harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -91,6 +102,17 @@ jobs:
           if [[ "$TOKEN_PRESENT" != true ]]; then
             echo "FAIL: PUBLIC_PH_READ_TOKEN is not accessible."
             exit 2
+          fi
+
+      - name: Verify read permission for Shift Planner before checkout
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if ! gh api repos/Sidious92/Shift-Planner --jq .full_name > /dev/null 2>&1; then
+            echo "FAIL: read token does not authorize the Shift Planner source repository."
+            exit 3
           fi
 
       - name: Checkout pinned Shift Planner source (read-only)
