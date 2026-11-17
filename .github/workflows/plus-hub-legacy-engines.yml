@@ -1,11 +1,6 @@
 name: PLUS HUB - Legacy domain engine characterization
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-legacy-engines.yml'
   workflow_dispatch:
 
 permissions:
