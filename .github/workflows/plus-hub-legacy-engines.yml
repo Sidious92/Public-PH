@@ -1,6 +1,11 @@
 name: PLUS HUB - Legacy domain engine characterization
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-legacy-engines.yml'
   workflow_dispatch:
 
 permissions:
@@ -18,19 +23,19 @@ jobs:
     steps:
       - name: Check access secret presence
         env:
-          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_X_SHIFT_REPORT_TOKEN != '' }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ "$TOKEN_PRESENT" != true ]]; then
-            echo "FAIL: PUBLIC_PH_READ_TOKEN is not accessible."
+            echo "FAIL: PUBLIC_PH_X_SHIFT_REPORT_TOKEN is not accessible."
             exit 2
           fi
 
       - name: Verify read permission for Shift Report before checkout
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUBLIC_PH_X_SHIFT_REPORT_TOKEN }}
         run: |
           set -euo pipefail
           if ! gh api repos/Sidious92/Shift-Report-New --jq .full_name > /dev/null 2>&1; then
@@ -58,7 +63,7 @@ jobs:
         with:
           repository: Sidious92/Shift-Report-New
           ref: 777bb52eecea605ef8dcbba491e2f20d85898663
-          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          token: ${{ secrets.PUBLIC_PH_X_SHIFT_REPORT_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
           lfs: false
@@ -95,19 +100,19 @@ jobs:
     steps:
       - name: Check access secret presence
         env:
-          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_X_SHIFT_PLANNER_TOKEN != '' }}
         shell: bash
         run: |
           set -euo pipefail
           if [[ "$TOKEN_PRESENT" != true ]]; then
-            echo "FAIL: PUBLIC_PH_READ_TOKEN is not accessible."
+            echo "FAIL: PUBLIC_PH_X_SHIFT_PLANNER_TOKEN is not accessible."
             exit 2
           fi
 
       - name: Verify read permission for Shift Planner before checkout
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUBLIC_PH_X_SHIFT_PLANNER_TOKEN }}
         run: |
           set -euo pipefail
           if ! gh api repos/Sidious92/Shift-Planner --jq .full_name > /dev/null 2>&1; then
@@ -120,7 +125,7 @@ jobs:
         with:
           repository: Sidious92/Shift-Planner
           ref: ccf723a6bbc8421c8bf6eb77466313b48c52539a
-          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          token: ${{ secrets.PUBLIC_PH_X_SHIFT_PLANNER_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
           lfs: false
