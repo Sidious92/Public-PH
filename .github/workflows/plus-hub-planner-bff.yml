@@ -1,0 +1,95 @@
+name: PLUS HUB - Planner BFF atomic command contracts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-bff.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  planner-bff-contracts:
+    name: Synthetic auth, concurrency and unit-of-work rollback (NO PostgreSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require read-only PLUS HUB secret
+        env:
+          READY: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$READY" = true
+
+      - name: Checkout exact private PLUS HUB candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: 68d9439c11f094b9123ad8befa2cbe549a995c87
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            apps
+            modules
+            packages
+            tests/architecture
+            tests/planner-domain
+            tests/planner-bff
+            tools/architecture
+            db
+          sparse-checkout-cone-mode: true
+          path: target
+
+      - name: Install Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Verify pinned candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target rev-parse HEAD)" = "68d9439c11f094b9123ad8befa2cbe549a995c87"
+          echo "Expected candidate source revision checked."
+
+      - name: Verify Planner BFF synthetic command contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd target && node --test tests/planner-bff/*.test.mjs) > "$RUNNER_TEMP/bff-contracts.log" 2>&1; then
+            echo "PASS: synthetic Planner BFF authorization and atomic-port contract tests."
+          else
+            echo "FAIL: synthetic Planner BFF contract tests."
+            awk '/^not ok [0-9]+ - /{ print "Failed test index:", $3 }' "$RUNNER_TEMP/bff-contracts.log"
+            grep -E '^[[:space:]]+(error:|expected:|actual:|code:|failureType:)' "$RUNNER_TEMP/bff-contracts.log" | cut -c1-180 | head -20 || true
+            exit 1
+          fi
+
+      - name: Validate scaffold imports and original Planner domain regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd target && npm test) > "$RUNNER_TEMP/bff-full.log" 2>&1; then
+            echo "PASS: complete source architecture and Planner synthetic unit tests."
+          else
+            echo "FAIL: complete source synthetic test suite."
+            exit 1
+          fi
+
+      - name: Ensure private source was not changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C target status --porcelain --untracked-files=no)"
+          echo "No source modifications."
+
+# Public logs contain no private source, HR records or raw test output.
+# No DB, OIDC/SSO, deployment or automatic production action.
