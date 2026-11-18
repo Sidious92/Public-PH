@@ -1,0 +1,133 @@
+name: PLUS HUB - Planner Phase 2 differential validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-phase2.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  planner-phase2:
+    name: Planner Phase 2 - source integrity, domain and differential tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Verify read-only token configuration
+        shell: bash
+        env:
+          HUB_READY: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+          PLANNER_READY: ${{ secrets.PUBLIC_PH_X_SHIFT_PLANNER_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$HUB_READY" = true
+          test "$PLANNER_READY" = true
+
+      - name: Checkout exact PLUS HUB Phase 2 source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: 40d9556c9f69befb0574ab054719750d655d21e8
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            apps
+            packages
+            modules
+            tools/architecture
+            tests/architecture
+            tests/planner-domain
+            db
+          sparse-checkout-cone-mode: true
+          path: target
+
+      - name: Checkout original Planner at pinned commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/Shift-Planner
+          ref: ccf723a6bbc8421c8bf6eb77466313b48c52539a
+          token: ${{ secrets.PUBLIC_PH_X_SHIFT_PLANNER_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            src
+            tests
+            fixtures
+          sparse-checkout-cone-mode: true
+          path: legacy
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Confirm exact commits
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target rev-parse HEAD)" = "40d9556c9f69befb0574ab054719750d655d21e8"
+          test "$(git -C legacy rev-parse HEAD)" = "ccf723a6bbc8421c8bf6eb77466313b48c52539a"
+          echo "Source SHAs pinned."
+
+      - name: Test architecture, source hashes and critical Phase 2 workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd target && npm test) > "$RUNNER_TEMP/planner-phase2-target.log" 2>&1; then
+            echo "PASS: target architecture, source fingerprints, and phase2 workflow regressions."
+          else
+            echo "FAIL: target phase2 tests; private test output withheld."
+            exit 1
+          fi
+
+      - name: Differential parity against original private Planner
+        shell: bash
+        env:
+          PLANNER_LEGACY_ROOT: ${{ github.workspace }}/legacy
+        run: |
+          set -euo pipefail
+          if (cd target && npm run test:planner-parity) > "$RUNNER_TEMP/planner-phase2-diff.log" 2>&1; then
+            echo "PASS: phase2 cases match pinned original domain source."
+          else
+            echo "FAIL: phase2 differential parity; private test output withheld."
+            exit 1
+          fi
+
+      - name: Legacy canonical regressions for FERIE, MALATTIA and week reconciler
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd legacy
+          for t in \
+            tests/request-week-reconciler-node-runner.js \
+            tests/v2-5-ferie-off-node-runner.js \
+            tests/v2-5-administrative-multiweek-node-runner.js \
+            tests/v2-5-administrative-illness-reversal-node-runner.js
+          do
+            if node "$t" > "$RUNNER_TEMP/planner-phase2-legacy.log" 2>&1; then
+              echo "PASS: pinned legacy regression suite."
+            else
+              echo "FAIL: pinned legacy regression suite; private test output withheld."
+              exit 1
+            fi
+          done
+
+      - name: Check original tracked files unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C target status --porcelain --untracked-files=no)"
+          test -z "$(git -C legacy status --porcelain --untracked-files=no)"
+          echo "Tracked source unchanged."
+
+# No artifacts, no untrusted pull_request trigger, no test secrets or private logs.
