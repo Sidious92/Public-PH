@@ -1,0 +1,97 @@
+name: PLUS HUB - Planner verified grants policy candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-iam-policy.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  planner-policy:
+    name: Attested principal, scoped grants and full Planner regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check private repo read-only token
+        shell: bash
+        env:
+          TOKEN_OK: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$TOKEN_OK" = true
+
+      - name: Checkout pinned private PLUS HUB policy branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: c3f321837f97885ff3bfc3541ed65c7d6635fbbc
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          lfs: false
+          submodules: false
+          fetch-depth: 1
+          sparse-checkout: |
+            apps
+            modules
+            packages
+            tests/architecture
+            tests/planner-domain
+            tests/planner-bff
+            tests/planner-schema
+            tools/architecture
+            db
+          sparse-checkout-cone-mode: true
+          path: candidate
+
+      - name: Setup Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify exact revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "c3f321837f97885ff3bfc3541ed65c7d6635fbbc"
+          echo "Exact candidate SHA verified."
+
+      - name: Validate identity and explicit authorization policies
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd candidate && node --test tests/planner-bff/identity-policy.test.mjs) > "$RUNNER_TEMP/iam-policy.log" 2>&1; then
+            echo "PASS: verified membership, resource grants and negative IAM contract tests."
+          else
+            echo "FAIL: policy contract tests. Raw private logs withheld."
+            awk '/^not ok [0-9]+ - /{print "Failed test index:",$3}' "$RUNNER_TEMP/iam-policy.log"
+            grep -E '^[[:space:]]+(error:|expected:|actual:|code:)' "$RUNNER_TEMP/iam-policy.log" | cut -c1-175 | head -16 || true
+            exit 1
+          fi
+
+      - name: Complete architecture and Planner synthetic regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd candidate && npm test) > "$RUNNER_TEMP/iam-regressions.log" 2>&1; then
+            echo "PASS: architecture, original Planner domain, BFF, IAM policy and SQL proposal regression."
+          else
+            echo "FAIL: Planner complete tests. Raw private logs withheld."
+            awk '/^not ok [0-9]+ - /{print "Failed test index:",$3}' "$RUNNER_TEMP/iam-regressions.log"
+            exit 1
+          fi
+
+      - name: Ensure private source unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C candidate status --porcelain --untracked-files=no)"
+          echo "PASS: tracked files unmodified."
+
+# Synthetic identities and policy fixtures only. No IdP, Core, production SQL,
+# personal data, artifact, untrusted PR event or deployment.
