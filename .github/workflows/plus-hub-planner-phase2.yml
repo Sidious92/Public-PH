@@ -94,6 +94,9 @@ jobs:
             else
               echo "FAIL: $category"
               awk '/^not ok [0-9]+ - /{ print "Failed test index:", $3 }' "$RUNNER_TEMP/planner-phase2-$category.log"
+              if [ "$category" = "phase2" ]; then
+                grep -E '^[[:space:]]+(error:|expected:|actual:|code:|failureType:)' "$RUNNER_TEMP/planner-phase2-$category.log" | cut -c1-170 | head -24 || true
+              fi
               exit 1
             fi
           done
