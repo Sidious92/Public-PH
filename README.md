@@ -14,6 +14,7 @@ Repository dedicato ai **runner GitHub Actions pubblici**. I sorgenti dei tre ap
 | [Planner BFF comandi](.github/workflows/plus-hub-planner-bff.yml) | permessi synthetic, CAS, replay e rollback simulato multiweek; **nessun PostgreSQL connesso** | **PASS** — [run 44291131659](https://github.com/Sidious92/Public-PH/actions/runs/44291131659) |
 | [Planner schema PostgreSQL (review)](.github/workflows/plus-hub-planner-schema-review.yml) | schema v0.2 NON ESEGUITO, P0 JSON/COMPLETED e storico, static lint + regressioni; **nessun DB** | **PASS** — [run 44295558351](https://github.com/Sidious92/Public-PH/actions/runs/44295558351) |
 | [Planner PostgreSQL 16 (ephemeral)](.github/workflows/plus-hub-planner-postgres-ephemeral.yml) | DDL v0.2 realmente eseguito su **solo DB usa e getta**, vincoli, batch multiweek, rollback, 2 client CAS | **PASS** — [run 44299138899](https://github.com/Sidious92/Public-PH/actions/runs/44299138899) |
+| [Planner BFF PostgreSQL driver](.github/workflows/plus-hub-planner-pg-driver.yml) | driver reale `pg` su DB **usa e getta**, motore originale, transazioni FERIE e due processi Node distinti; IAM sintetico | **PASS** — [run 44302542399](https://github.com/Sidious92/Public-PH/actions/runs/44302542399) |
 
 Anche l'ultimo workflow Planner è ripristinato alla modalità manuale; i commit sorgente sono pin.
 
