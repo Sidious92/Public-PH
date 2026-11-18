@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: 68d9439c11f094b9123ad8befa2cbe549a995c87
+          ref: eeb99e6f3ae66bc86cf9711714c1ad5c7dc3ba1e
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C target rev-parse HEAD)" = "68d9439c11f094b9123ad8befa2cbe549a995c87"
+          test "$(git -C target rev-parse HEAD)" = "eeb99e6f3ae66bc86cf9711714c1ad5c7dc3ba1e"
           echo "Expected candidate source revision checked."
 
       - name: Verify Planner BFF synthetic command contracts
