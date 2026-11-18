@@ -2,11 +2,6 @@ name: PLUS HUB - Planner engine extraction parity
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-planner-extraction.yml'
 
 permissions:
   contents: read
