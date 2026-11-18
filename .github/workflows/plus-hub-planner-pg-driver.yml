@@ -1,6 +1,11 @@
 name: PLUS HUB - Planner BFF real PostgreSQL driver (disposable)
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-pg-driver.yml'
   workflow_dispatch:
 
 permissions:
@@ -45,7 +50,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: cd714f7582aab2e8ae3f2d94c5b62a22512eac8f
+          ref: 3018e77d74dc165b418ff8a180381a3bcaa8a7cd
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -93,7 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C private-src rev-parse HEAD)" = "cd714f7582aab2e8ae3f2d94c5b62a22512eac8f"
+          test "$(git -C private-src rev-parse HEAD)" = "3018e77d74dc165b418ff8a180381a3bcaa8a7cd"
           test -f private-src/docs/proposals/PLANNER_PG_SCHEMA_V0_2_REVIEW.sql.txt
           test "$(find private-src/db/planner/migrations -type f | wc -l)" -eq 1
           echo "Pinned source and no executable migration confirmed."
