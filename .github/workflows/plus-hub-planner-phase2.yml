@@ -83,12 +83,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if (cd target && npm test) > "$RUNNER_TEMP/planner-phase2-target.log" 2>&1; then
-            echo "PASS: target architecture, source fingerprints, and phase2 workflow regressions."
-          else
-            echo "FAIL: target phase2 tests; private test output withheld."
-            exit 1
-          fi
+          for category in architecture baseline phase2; do
+            case "$category" in
+              architecture) script="tests/architecture/*.test.mjs";;
+              baseline) script="tests/planner-domain/engine-baseline.test.mjs";;
+              phase2) script="tests/planner-domain/phase2-workflows.test.mjs";;
+            esac
+            if (cd target && node --test $script) > "$RUNNER_TEMP/planner-phase2-$category.log" 2>&1; then
+              echo "PASS: $category"
+            else
+              echo "FAIL: $category"
+              awk '/^not ok [0-9]+ - /{ print "Failed test index:", $3 }' "$RUNNER_TEMP/planner-phase2-$category.log"
+              exit 1
+            fi
+          done
 
       - name: Differential parity against original private Planner
         shell: bash
