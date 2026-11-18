@@ -1,11 +1,6 @@
 name: PLUS HUB - Planner Phase 2 differential validation
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-planner-phase2.yml'
   workflow_dispatch:
 
 permissions:
