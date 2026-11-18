@@ -1,0 +1,93 @@
+name: PLUS HUB - Planner schema proposal review (NO DATABASE)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-schema-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  review-only:
+    name: Static DDL review and regression (NEVER run SQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Require private read-only token
+        shell: bash
+        env:
+          TOKEN_READY: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$TOKEN_READY" = true
+
+      - name: Checkout exact private proposal commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: b6d92cc767b5ca21db82c5193a308c2c1d336e20
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            apps
+            modules
+            packages
+            docs/proposals
+            tests
+            tools
+            db
+          sparse-checkout-cone-mode: true
+          path: source
+
+      - name: Setup Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Verify exact source SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C source rev-parse HEAD)" = "b6d92cc767b5ca21db82c5193a308c2c1d336e20"
+          echo "Pinned private candidate verified."
+
+      - name: Validate review-only schema boundaries without database
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd source && npm run test:planner-schema-review) > "$RUNNER_TEMP/schema-review.log" 2>&1; then
+            echo "PASS: static schema proposal checks. NOT a PostgreSQL syntax or migration test."
+          else
+            echo "FAIL: schema proposal structure checks."
+            awk '/^not ok [0-9]+ - /{ print "Failed test index:", $3 }' "$RUNNER_TEMP/schema-review.log"
+            grep -E '^[[:space:]]+(error:|expected:|actual:|code:)' "$RUNNER_TEMP/schema-review.log" | cut -c1-155 | head -12 || true
+            exit 1
+          fi
+
+      - name: Run complete existing synthetic regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd source && npm test) > "$RUNNER_TEMP/schema-all-tests.log" 2>&1; then
+            echo "PASS: PLUS HUB architecture, Planner domain, BFF and static schema checks."
+          else
+            echo "FAIL: complete synthetic suite; logs withheld."
+            exit 1
+          fi
+
+      - name: Verify no tracked source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C source status --porcelain --untracked-files=no)"
+          echo "No source modification."
+
+# No psql, CREATE DATABASE, DDL execution, deploy, artifacts, or real data.
