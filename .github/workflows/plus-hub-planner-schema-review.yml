@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: b6d92cc767b5ca21db82c5193a308c2c1d336e20
+          ref: 551ad9d9b19ff2fc9f2f08e3242a5da46c5e04ae
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -56,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C source rev-parse HEAD)" = "b6d92cc767b5ca21db82c5193a308c2c1d336e20"
+          test "$(git -C source rev-parse HEAD)" = "551ad9d9b19ff2fc9f2f08e3242a5da46c5e04ae"
           echo "Pinned private candidate verified."
 
       - name: Validate review-only schema boundaries without database
