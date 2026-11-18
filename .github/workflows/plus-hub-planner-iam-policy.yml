@@ -43,6 +43,7 @@ jobs:
             tests/planner-domain
             tests/planner-bff
             tests/planner-schema
+            docs/proposals
             tools/architecture
             db
           sparse-checkout-cone-mode: true
