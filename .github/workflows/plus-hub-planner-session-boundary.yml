@@ -1,0 +1,98 @@
+name: PLUS HUB - Planner HTTP session boundary contracts
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-session-boundary.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  session-boundary:
+    name: Opaque cookie, trusted TLS, Origin, CSRF and revocation (synthetic)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check read-only private source token
+        shell: bash
+        env:
+          READ_TOKEN_READY: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$READ_TOKEN_READY" = true
+
+      - name: Checkout pinned private security candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: 51a03b1f0dd83dc86dd9a275226695f1d3c1e81e
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            apps
+            modules
+            packages
+            tests/architecture
+            tests/planner-domain
+            tests/planner-bff
+            tests/planner-schema
+            docs/proposals
+            tools/architecture
+            db
+          sparse-checkout-cone-mode: true
+          path: candidate
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Verify exact candidate commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C candidate rev-parse HEAD)" = "51a03b1f0dd83dc86dd9a275226695f1d3c1e81e"
+          echo "Exact source revision verified."
+
+      - name: Verify provider-neutral HTTP session contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd candidate && node --test tests/planner-bff/http-session-boundary.test.mjs) > "$RUNNER_TEMP/session-contract.log" 2>&1; then
+            echo "PASS: opaque-cookie, session expiry, revocation, origin and CSRF tests."
+          else
+            echo "FAIL: HTTP session boundary tests."
+            awk '/^not ok [0-9]+ - /{ print "Failed case:", $3 }' "$RUNNER_TEMP/session-contract.log"
+            grep -E '^[[:space:]]+(error:|expected:|actual:|code:|failureType:)' "$RUNNER_TEMP/session-contract.log" | cut -c1-175 | head -15 || true
+            exit 1
+          fi
+
+      - name: Verify all architecture and Planner synthetic regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd candidate && npm test) > "$RUNNER_TEMP/session-all.log" 2>&1; then
+            echo "PASS: architecture, original Planner engine, command BFF and session/IAM regressions."
+          else
+            echo "FAIL: full synthetic regression suite; raw logs withheld."
+            awk '/^not ok [0-9]+ - /{ print "Failed case:", $3 }' "$RUNNER_TEMP/session-all.log"
+            exit 1
+          fi
+
+      - name: Verify no tracked private files were changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C candidate status --porcelain --untracked-files=no)"
+          echo "Private source unchanged."
+
+# No external identity provider, real user, corporate session store, HR data,
+# SQL migration, deployment, artifacts or private test source in public logs.
