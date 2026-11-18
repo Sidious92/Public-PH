@@ -1,11 +1,6 @@
 name: PLUS HUB - Planner BFF real PostgreSQL driver (disposable)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-planner-pg-driver.yml'
   workflow_dispatch:
 
 permissions:
