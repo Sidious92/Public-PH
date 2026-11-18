@@ -9,8 +9,10 @@ Repository dedicato ai **runner GitHub Actions pubblici**. I sorgenti dei tre ap
 | [Fixture Shift Report](.github/workflows/plus-hub-fixtures.yml) | struttura delle fixture sintetiche della PR #50 | **PASS** — [run 44177186028](https://github.com/Sidious92/Public-PH/actions/runs/44177186028) |
 | [Architettura PLUS HUB](.github/workflows/plus-hub-architecture.yml) | suite dei confini architetturali dello scaffold PR #47 | **PASS** — [run 44177393214](https://github.com/Sidious92/Public-PH/actions/runs/44177393214) |
 | [Motori legacy](.github/workflows/plus-hub-legacy-engines.yml) | source effettivo di Shift Report e tre suite Node Shift Planner | **PASS, entrambi i job** — [run 44183858636](https://github.com/Sidious92/Public-PH/actions/runs/44183858636) |
+| [Planner fase 1](.github/workflows/plus-hub-planner-extraction.yml) | sei moduli originali, source SHA e confronto differenziale | **PASS** — [run 44222037745](https://github.com/Sidious92/Public-PH/actions/runs/44222037745) |
+| [Planner fase 2](.github/workflows/plus-hub-planner-phase2.yml) | 14 moduli, NIGHT cross-week, FERIE/ROL, MALATTIA, editing/finalizzazione e confronto sorgente | **PASS** — [run 44226060383](https://github.com/Sidious92/Public-PH/actions/runs/44226060383) |
 
-Il PASS dei motori legacy dimostra **solo i test selezionati sui commit specifici**. Non dimostra equivalenza fra sistemi, sicurezza in produzione, versioni effettivamente distribuite sui PC, PDF visuali o conformità di tutti i gate G0–G8.
+Anche l'ultimo workflow Planner è ripristinato alla modalità manuale; i commit sorgente sono pin.\n\nIl PASS dei motori legacy dimostra **solo i test selezionati sui commit specifici**. Non dimostra equivalenza fra sistemi, sicurezza in produzione, versioni effettivamente distribuite sui PC, PDF visuali o conformità di tutti i gate G0–G8.
 
 ## Mappa dei secret — permessi minimi
 
