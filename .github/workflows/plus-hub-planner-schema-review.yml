@@ -1,6 +1,11 @@
 name: PLUS HUB - Planner schema proposal review (NO DATABASE)
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-schema-review.yml'
   workflow_dispatch:
 
 permissions:
@@ -24,7 +29,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: 551ad9d9b19ff2fc9f2f08e3242a5da46c5e04ae
+          ref: d2d61b5c1087db0734d00ca3b90e77b22fc0139b
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -51,7 +56,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C source rev-parse HEAD)" = "551ad9d9b19ff2fc9f2f08e3242a5da46c5e04ae"
+          test "$(git -C source rev-parse HEAD)" = "d2d61b5c1087db0734d00ca3b90e77b22fc0139b"
           echo "Pinned private candidate verified."
 
       - name: Validate review-only schema boundaries without database
