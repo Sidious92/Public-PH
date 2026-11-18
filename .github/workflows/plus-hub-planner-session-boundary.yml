@@ -2,11 +2,6 @@ name: PLUS HUB - Planner HTTP session boundary contracts
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-planner-session-boundary.yml'
 
 permissions:
   contents: read
@@ -29,7 +24,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: 51a03b1f0dd83dc86dd9a275226695f1d3c1e81e
+          ref: 3fb84e7f0605f304aeda2a3d899257f5c77271ca
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -59,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C candidate rev-parse HEAD)" = "51a03b1f0dd83dc86dd9a275226695f1d3c1e81e"
+          test "$(git -C candidate rev-parse HEAD)" = "3fb84e7f0605f304aeda2a3d899257f5c77271ca"
           echo "Exact source revision verified."
 
       - name: Verify provider-neutral HTTP session contract tests
