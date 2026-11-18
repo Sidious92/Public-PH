@@ -1,6 +1,11 @@
 name: PLUS HUB - Planner Phase 2 differential validation
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-phase2.yml'
   workflow_dispatch:
 
 permissions:
@@ -26,7 +31,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: f0a882fe80e18c6b6799523cbc6f9dcaf4c6faa2
+          ref: 197bc365e147d006cc6c90bff430a2668f02f592
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -70,7 +75,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C target rev-parse HEAD)" = "f0a882fe80e18c6b6799523cbc6f9dcaf4c6faa2"
+          test "$(git -C target rev-parse HEAD)" = "197bc365e147d006cc6c90bff430a2668f02f592"
           test "$(git -C legacy rev-parse HEAD)" = "ccf723a6bbc8421c8bf6eb77466313b48c52539a"
           echo "Source SHAs pinned."
 
