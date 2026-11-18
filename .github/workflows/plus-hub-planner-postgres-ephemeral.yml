@@ -1,0 +1,130 @@
+name: PLUS HUB - Disposable PostgreSQL 16 integration (no company data)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-postgres-ephemeral.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ephemeral-pg16-contracts:
+    name: Actual PG16 DDL, constraints, rollback and row locks
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: planner_ci
+          POSTGRES_PASSWORD: synthetic-ephemeral-password-only
+          POSTGRES_DB: planner_ci_ephemeral
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planner_ci -d planner_ci_ephemeral"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: planner_ci
+      PGPASSWORD: synthetic-ephemeral-password-only
+      PGDATABASE: planner_ci_ephemeral
+      PLANNER_PG_EPHEMERAL: "true"
+    steps:
+      - name: Require read-only PLUS HUB repository secret
+        shell: bash
+        env:
+          TOKEN_READY: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$TOKEN_READY" = true
+
+      - name: Checkout exact PLUS HUB PostgreSQL test PR revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: 6dc843e6c3ffe5a04fdd46c169c6cfdf3f982626
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            docs/proposals
+            tests/planner-postgres
+            tests/planner-schema
+            tests/planner-domain
+            tests/planner-bff
+            tests/architecture
+            apps
+            modules
+            packages
+            tools
+            db
+          sparse-checkout-cone-mode: true
+          path: private-src
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Install PostgreSQL client on disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq > "$RUNNER_TEMP/apt-update.log" 2>&1
+          sudo apt-get install -qq -y postgresql-client > "$RUNNER_TEMP/apt-install.log" 2>&1
+          pg_isready -h 127.0.0.1 -p 5432 -U planner_ci -d planner_ci_ephemeral > /dev/null
+          echo "Disposable PostgreSQL service is ready."
+
+      - name: Verify private source SHA and prevent accidental migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C private-src rev-parse HEAD)" = "6dc843e6c3ffe5a04fdd46c169c6cfdf3f982626"
+          test -f private-src/docs/proposals/PLANNER_PG_SCHEMA_V0_2_REVIEW.sql.txt
+          test -f private-src/db/planner/migrations/README.md
+          test "$(find private-src/db/planner/migrations -type f | wc -l)" -eq 1
+          echo "Pinned, non-migratable source verified."
+
+      - name: Execute actual PostgreSQL DDL and synthetic failure-mode tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm run test:planner-postgres-ephemeral) > "$RUNNER_TEMP/pg16-test.log" 2>&1; then
+            echo "PASS: disposable PostgreSQL 16+ DDL, constraints, rollback and lock tests."
+          else
+            echo "FAIL: disposable PostgreSQL DDL/integrity tests."
+            grep -E '(FAIL:|SQL_ERROR|SQL.*:|PostgreSQL client|assertion|not equal|expected|SQLSTATE)' "$RUNNER_TEMP/pg16-test.log" | cut -c 1-190 | head -15 || true
+            exit 1
+          fi
+
+      - name: Verify normal synthetic architecture regressions unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm test) > "$RUNNER_TEMP/planner-existing.log" 2>&1; then
+            echo "PASS: PLUS HUB scaffold, Planner domain/BFF and schema static tests."
+          else
+            echo "FAIL: existing synthetic regressions. Raw output withheld."
+            exit 1
+          fi
+
+      - name: Verify read-only checkout and destruction with runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C private-src status --porcelain --untracked-files=no)"
+          echo "PASS: source unchanged; disposable database is only retained for job lifetime."
+
+# Temporary PG test only. No company database, actual HR data, published
+# artifacts, credentials stored in Git, migrations or deployment.
