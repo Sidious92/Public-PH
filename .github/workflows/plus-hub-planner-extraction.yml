@@ -1,0 +1,112 @@
+name: PLUS HUB - Planner engine extraction parity
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-extraction.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  planner-extraction:
+    name: Copied source fingerprints, standalone and differential parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check two read-only secrets
+        shell: bash
+        env:
+          HUB_READY: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+          PLANNER_READY: ${{ secrets.PUBLIC_PH_X_SHIFT_PLANNER_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$HUB_READY" = true
+          test "$PLANNER_READY" = true
+
+      - name: Checkout PLUS HUB extraction PR pinned SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: e770c255331608e9eaab8535ab1036fa747115e1
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          lfs: false
+          submodules: false
+          fetch-depth: 1
+          sparse-checkout: |
+            apps
+            packages
+            modules
+            tools/architecture
+            tests/architecture
+            tests/planner-domain
+            db
+          sparse-checkout-cone-mode: true
+          path: target
+
+      - name: Checkout Shift Planner original pinned SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/Shift-Planner
+          ref: ccf723a6bbc8421c8bf6eb77466313b48c52539a
+          token: ${{ secrets.PUBLIC_PH_X_SHIFT_PLANNER_TOKEN }}
+          persist-credentials: false
+          lfs: false
+          submodules: false
+          fetch-depth: 1
+          sparse-checkout: |
+            src/core
+          sparse-checkout-cone-mode: true
+          path: legacy
+
+      - name: Setup Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Validate exact source SHA selection
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C target rev-parse HEAD)" = "e770c255331608e9eaab8535ab1036fa747115e1"
+          test "$(git -C legacy rev-parse HEAD)" = "ccf723a6bbc8421c8bf6eb77466313b48c52539a"
+          echo "Source revisions pinned."
+
+      - name: Verify structure and extracted-domain behaviors
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd target && npm test) > "$RUNNER_TEMP/planner-standalone.log" 2>&1; then
+            echo "PASS: scaffold architecture and pinned Planner domain standalone tests."
+          else
+            echo "FAIL: target standalone test. Raw output withheld from public logs."
+            exit 1
+          fi
+
+      - name: Differential parity against original pinned Planner
+        shell: bash
+        env:
+          PLANNER_LEGACY_ROOT: ${{ github.workspace }}/legacy
+        run: |
+          set -euo pipefail
+          if (cd target && npm run test:planner-parity) > "$RUNNER_TEMP/planner-differential.log" 2>&1; then
+            echo "PASS: extracted Planner validator outputs agree with pinned original for synthetic test cases."
+          else
+            echo "FAIL: Planner source parity mismatch. Raw output withheld from public logs."
+            exit 1
+          fi
+
+      - name: Verify tracked source remains unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C target status --porcelain --untracked-files=no)"
+          test -z "$(git -C legacy status --porcelain --untracked-files=no)"
+          echo "No tracked modifications."
+
+# No artifacts, no user-controlled refs, and no raw private logs.
