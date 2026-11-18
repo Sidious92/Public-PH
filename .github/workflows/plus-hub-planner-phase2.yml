@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: 40d9556c9f69befb0574ab054719750d655d21e8
+          ref: f0a882fe80e18c6b6799523cbc6f9dcaf4c6faa2
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -75,7 +75,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C target rev-parse HEAD)" = "40d9556c9f69befb0574ab054719750d655d21e8"
+          test "$(git -C target rev-parse HEAD)" = "f0a882fe80e18c6b6799523cbc6f9dcaf4c6faa2"
           test "$(git -C legacy rev-parse HEAD)" = "ccf723a6bbc8421c8bf6eb77466313b48c52539a"
           echo "Source SHAs pinned."
 
