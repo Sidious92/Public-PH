@@ -1,6 +1,11 @@
 name: PLUS HUB - Disposable PostgreSQL 16 integration (no company data)
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-postgres-ephemeral.yml'
   workflow_dispatch:
 
 permissions:
@@ -45,7 +50,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: 6dc843e6c3ffe5a04fdd46c169c6cfdf3f982626
+          ref: 2669da462b9bf4f8d7423612f4c89a0f093ed8eb
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -85,7 +90,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C private-src rev-parse HEAD)" = "6dc843e6c3ffe5a04fdd46c169c6cfdf3f982626"
+          test "$(git -C private-src rev-parse HEAD)" = "2669da462b9bf4f8d7423612f4c89a0f093ed8eb"
           test -f private-src/docs/proposals/PLANNER_PG_SCHEMA_V0_2_REVIEW.sql.txt
           test -f private-src/db/planner/migrations/README.md
           test "$(find private-src/db/planner/migrations -type f | wc -l)" -eq 1
