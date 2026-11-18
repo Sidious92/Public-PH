@@ -2,11 +2,6 @@ name: PLUS HUB - Planner verified grants policy candidate
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-planner-iam-policy.yml'
 
 permissions:
   contents: read
@@ -29,7 +24,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: c3f321837f97885ff3bfc3541ed65c7d6635fbbc
+          ref: 3018e77d74dc165b418ff8a180381a3bcaa8a7cd
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           lfs: false
@@ -59,7 +54,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C candidate rev-parse HEAD)" = "c3f321837f97885ff3bfc3541ed65c7d6635fbbc"
+          test "$(git -C candidate rev-parse HEAD)" = "3018e77d74dc165b418ff8a180381a3bcaa8a7cd"
           echo "Exact candidate SHA verified."
 
       - name: Validate identity and explicit authorization policies
