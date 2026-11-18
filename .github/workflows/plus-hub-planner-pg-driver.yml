@@ -1,0 +1,147 @@
+name: PLUS HUB - Planner BFF real PostgreSQL driver (disposable)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/plus-hub-planner-pg-driver.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  planner-pg-driver:
+    name: Node BFF + actual PG16 Pool, CAS, multiweek rollback and two Node processes
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: planner_ci
+          POSTGRES_PASSWORD: synthetic-ephemeral-password-only
+          POSTGRES_DB: planner_ci_ephemeral
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U planner_ci -d planner_ci_ephemeral"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: planner_ci
+      PGPASSWORD: synthetic-ephemeral-password-only
+      PGDATABASE: planner_ci_ephemeral
+      PLANNER_PG_EPHEMERAL: "true"
+    steps:
+      - name: Verify private PLUS HUB access
+        shell: bash
+        env:
+          READY: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$READY" = true
+
+      - name: Checkout pinned private Planner BFF candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: b5c76e3587cd1a137a8212ff8a98710a142aa7ad
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            apps
+            modules
+            packages
+            tests
+            tools
+            db
+            docs/proposals
+          sparse-checkout-cone-mode: true
+          path: private-src
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Install pinned node-postgres dependency with no lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm install --ignore-scripts --no-audit --no-fund --package-lock=false) > "$RUNNER_TEMP/npm-deps.log" 2>&1; then
+            node -e "const p=require('./private-src/node_modules/pg/package.json');if(p.version!=='8.23.1')process.exit(1)"
+            echo "Pinned node-postgres version installed for disposable CI."
+          else
+            echo "FAIL: npm dependency setup. Package detail withheld."
+            exit 1
+          fi
+
+      - name: Install PostgreSQL client on ephemeral runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq > "$RUNNER_TEMP/apt-update.log" 2>&1
+          sudo apt-get install -qq -y postgresql-client > "$RUNNER_TEMP/apt-install.log" 2>&1
+          pg_isready -h 127.0.0.1 -p 5432 -U planner_ci -d planner_ci_ephemeral > /dev/null
+          echo "Disposable PostgreSQL 16 ready."
+
+      - name: Confirm exact source commit and non-migration DDL status
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C private-src rev-parse HEAD)" = "b5c76e3587cd1a137a8212ff8a98710a142aa7ad"
+          test -f private-src/docs/proposals/PLANNER_PG_SCHEMA_V0_2_REVIEW.sql.txt
+          test "$(find private-src/db/planner/migrations -type f | wc -l)" -eq 1
+          echo "Pinned source and no executable migration confirmed."
+
+      - name: Apply review DDL ONLY to disposable DB and run SQL baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm run test:planner-postgres-ephemeral) > "$RUNNER_TEMP/pg-schema.log" 2>&1; then
+            echo "PASS: actual PostgreSQL schema, data constraints and SQL client concurrency."
+          else
+            echo "FAIL: PostgreSQL schema baseline. Raw output withheld."
+            exit 1
+          fi
+
+      - name: Verify BFF application commands using real PostgreSQL Pool
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm run test:planner-bff-postgres) > "$RUNNER_TEMP/pg-driver.log" 2>&1; then
+            echo "PASS: Planner BFF PostgreSQL driver, idempotency, multiweek rollback and two Node processes."
+          else
+            echo "FAIL: Planner BFF PostgreSQL driver tests."
+            grep '^FAIL:' "$RUNNER_TEMP/pg-driver.log" | cut -c 1-150 | head -6 || true
+            exit 1
+          fi
+
+      - name: Preserve baseline synthetic domain and security regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm test) > "$RUNNER_TEMP/planner-regressions.log" 2>&1; then
+            echo "PASS: architecture, legacy domain, Planner BFF and schema static regressions."
+          else
+            echo "FAIL: existing synthetic regressions. Raw output withheld."
+            exit 1
+          fi
+
+      - name: Ensure no tracked private source changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C private-src status --porcelain --untracked-files=no)"
+          echo "Private tracked files unchanged."
+
+# No enterprise PostgreSQL, grants, OIDC, deploy, artifacts or public raw logs.
