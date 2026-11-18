@@ -1,11 +1,6 @@
 name: PLUS HUB - Planner schema proposal review (NO DATABASE)
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/plus-hub-planner-schema-review.yml'
   workflow_dispatch:
 
 permissions:
