@@ -73,8 +73,7 @@ jobs:
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
           test -f private-src/package.json
           test -f private-src/tests/architecture/import-boundaries.test.mjs
-          test -f private-src/tests/report-domain/handovers.test.mjs
-          test -f private-src/tests/report-bff/handover-commands.test.mjs
+          test -f private-src/tests/planner-domain/engine-baseline.test.mjs
           echo 'Verified pinned PLUS-HUB revision and test entrypoints.'
 
       - name: Run full PLUS-HUB synthetic test suite without publishing raw logs
