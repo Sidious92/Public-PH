@@ -4,7 +4,7 @@
 
 ## Why
 
-Remote development from a managed/company PC cannot rely on installing local Node, PostgreSQL or Edge testing utilities. This workflow runs the **same synthetic Node test suite** in a disposable GitHub-hosted runner, directly from **one private source repository `Sidious92/PLUS-HUB`**, without any Shift Planner / Shift Report legacy checkout.
+Remote development from a managed/company PC cannot rely on installing local Node, PostgreSQL or Edge testing utilities. This proposal contains two **manual** workflows: the baseline synthetic Node test suite and a separate PostgreSQL 16 disposable integration gate in a GitHub-hosted runner, directly from **one private source repository `Sidious92/PLUS-HUB`**, without any Shift Planner / Shift Report legacy checkout.
 
 The workflow does not certify Home Lab UI/Edge, real PostgreSQL concurrency, authentication, PDF or company deployment.
 
@@ -34,3 +34,13 @@ Useful candidate PRs to verify separately: PLUS-HUB #64 (Planner UI), #65 (Plann
 - Synthetic unit tests alone are not proof that an authorization scheme or database implementation is production safe. Production controls require independent IT/Privacy approval.
 
 The workflow remains **inert until explicitly merged and manually executed**.
+
+## Report R3 — Disposable PostgreSQL 16 (separate manual workflow)
+
+A second candidate workflow, `.github/workflows/plus-hub-report-pg-ephemeral.yml`, checks out a **reviewed exact PLUS-HUB SHA** into an ephemeral GitHub runner, starts a new PostgreSQL 16 service database named `plus_hub_report_test` with **synthetic fixed CI-only credentials**, installs pinned workspace dependencies without lifecycle scripts and runs `tests/report-postgres/handover-driver-integration.mjs`.
+
+The integration gate deliberately refuses any host other than loopback/`postgres`, requires explicit `PLUS_HUB_EPHEMERAL_REPORT_PG=yes`, and rejects database names outside the `plus_hub_report_test` namespace or a previously populated database. It exercises real atomic event/audit/receipt writes, rollback, scoped permissions and two separate Node workers racing on one aggregate.
+
+As with the synthetic gate, this workflow **is not available to run until the PR has been reviewed, approved, and merged to Public-PH main**. Even then, it runs only when a maintainer manually enters a reviewed exact SHA. No automatic runs, public artifacts or private raw logs. The disposable database is a GitHub-hosted service, never an existing/company PostgreSQL instance.
+
+**Additional residual risk:** installation of npm dependencies on an online runner may access the npm registry; versions are pinned at workspace level but the dependency graph is not yet locked with a checked-in lockfile. Before promoting this workflow as a routine security gate, a reproducible dependency lock and supply-chain review should be ratified.
