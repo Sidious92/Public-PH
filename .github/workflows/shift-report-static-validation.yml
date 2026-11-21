@@ -1,0 +1,160 @@
+name: Shift Report - Integrated static validation (private pinned source)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/shift-report-static-validation.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ph-shift-report-static-validation
+  cancel-in-progress: false
+
+jobs:
+  static-validation:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    name: Static validation for integrated Shift Report (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: eb4caa36d8faa45c083dc4463e31e220de46cde0
+    steps:
+      - name: Confirm read-only source access is configured
+        shell: bash
+        env:
+          TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_X_SHIFT_REPORT_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          test "$TOKEN_PRESENT" = true || { echo 'FAIL: Shift Report read-only token is unavailable'; exit 2; }
+
+      - name: Checkout reviewed private Shift Report commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/Shift-Report-New
+          ref: eb4caa36d8faa45c083dc4463e31e220de46cde0
+          token: ${{ secrets.PUBLIC_PH_X_SHIFT_REPORT_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          path: private-src
+
+      - name: Verify exact source and prevent tracked DB files
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
+          test -f private-src/index.html
+          test -f private-src/.github/workflows/validate-enterprise-branch.yml
+          if git -C private-src ls-files | grep -E '(^|/)DB/' >/dev/null; then
+            echo 'FAIL: DB content tracked in source repository.'
+            exit 4
+          fi
+          echo 'PASS: exact integrated source SHA and DB boundary.'
+
+      - name: Set up Node 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Check syntax of every JavaScript file
+        shell: bash
+        working-directory: private-src
+        run: |
+          set -euo pipefail
+          failures=0
+          while IFS= read -r -d '' file; do
+            if ! node --check "$file" > "$RUNNER_TEMP/shift-report-check.log" 2>&1; then
+              failures=$((failures + 1))
+            fi
+          done < <(find . -type f -name '*.js' -not -path './.git/*' -print0)
+          if [ "$failures" -ne 0 ]; then
+            echo "FAIL: JavaScript syntax errors in $failures files (details not published)."
+            exit 1
+          fi
+          echo 'PASS: all JavaScript syntax checks.'
+
+      - name: Validate all local index assets
+        shell: bash
+        working-directory: private-src
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          class AssetParser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.assets = []
+              def handle_starttag(self, tag, attrs):
+                  values = dict(attrs)
+                  if tag == 'script' and values.get('src'):
+                      self.assets.append(values['src'])
+                  if tag == 'link' and values.get('href'):
+                      self.assets.append(values['href'])
+          parser = AssetParser()
+          parser.feed(Path('index.html').read_text(encoding='utf-8'))
+          missing = []
+          for asset in parser.assets:
+              parsed = urlsplit(asset)
+              if parsed.scheme or parsed.netloc:
+                  continue
+              target = parsed.path.lstrip('/')
+              if target and not Path(target).is_file():
+                  missing.append(target)
+          if missing:
+              raise SystemExit('FAIL: local assets missing (names withheld from public logs).')
+          print('PASS: local HTML assets.')
+          PY
+
+      - name: Run all tests referenced by native static-validation
+        shell: bash
+        working-directory: private-src
+        run: |
+          set -euo pipefail
+          python - <<'PY' > "$RUNNER_TEMP/shift-report-test-list.txt"
+          import re
+          from pathlib import Path
+          source = Path('.github/workflows/validate-enterprise-branch.yml').read_text(encoding='utf-8')
+          tests = re.findall(r'\bnode\s+(tests/[A-Za-z0-9_./-]+\.js)\b', source)
+          if len(tests) < 30 or len(set(tests)) != len(tests):
+              raise SystemExit('Expected native static validation Node tests are missing or duplicated.')
+          for test in tests:
+              if not Path(test).is_file():
+                  raise SystemExit('FAIL: a required Node test file is missing.')
+              print(test)
+          PY
+          total=0
+          failures=0
+          while IFS= read -r test_file; do
+            total=$((total + 1))
+            if ! node "$test_file" > "$RUNNER_TEMP/shift-report-private-test.log" 2>&1; then
+              failures=$((failures + 1))
+              echo "FAIL: test gate $total (private details withheld)."
+            fi
+          done < "$RUNNER_TEMP/shift-report-test-list.txt"
+          echo "Native static-validation Node gates: $total; failures: $failures"
+          test "$failures" -eq 0
+
+      - name: Verify tracked source remained unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C private-src status --porcelain --untracked-files=no)"
+          echo 'PASS: tracked source unchanged.'
+
+      - name: Remove private files and local test logs
+        if: always()
+        shell: bash
+        run: |
+          rm -rf private-src
+          rm -f "$RUNNER_TEMP"/shift-report-check.log "$RUNNER_TEMP"/shift-report-test-list.txt "$RUNNER_TEMP"/shift-report-private-test.log
+
+# Public CI executes only an immutable reviewed private revision.
+# No customer data, OneDrive, artifacts, caches, test output, or private source publication.
