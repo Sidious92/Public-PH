@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      SOURCE_SHA: f770abc19db9113b9a0619b8bd7b2ec5bea97d96
+      SOURCE_SHA: a9eb2e33fd93d6a52695661f5d7ad7ca345258e9
     steps:
       - name: Confirm read-only source access is configured
         shell: bash
@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/Shift-Report-New
-          ref: f770abc19db9113b9a0619b8bd7b2ec5bea97d96
+          ref: a9eb2e33fd93d6a52695661f5d7ad7ca345258e9
           token: ${{ secrets.PUBLIC_PH_X_SHIFT_REPORT_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -142,6 +142,59 @@ jobs:
           echo "Native static-validation Node gates: $total; failures: $failures"
           test "$failures" -eq 0
 
+      - name: Build and audit company ZIP without publishing any private files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! pwsh -NoProfile -File private-src/scripts/build-company-package.ps1 -DestinationDirectory "$RUNNER_TEMP/company-package" > "$RUNNER_TEMP/company-package-build.log" 2>&1; then
+            echo 'FAIL: company offline package build or local dependency validation.'
+            exit 1
+          fi
+          python - <<'PY'
+          from pathlib import Path, PurePosixPath
+          from zipfile import ZipFile
+          import os
+          dist = Path(os.environ['RUNNER_TEMP']) / 'company-package'
+          packages = list(dist.glob('SHIFT-REPORT-PC-*.zip'))
+          if len(packages) != 1:
+              raise SystemExit('FAIL: expected one company ZIP.')
+          with ZipFile(packages[0]) as archive:
+              names = set(x.filename for x in archive.infolist() if not x.is_dir())
+          root = 'Shift Report - PLUS Florence/'
+          needed = {
+              root + 'index.html',root + 'app.js',root + 'logo.png',
+              root + 'Logo PLUS Florence.png',root + 'Logo Procedure Center.png',
+              root + 'Logo T&T.png',root + 'ISTRUZIONI_PC.txt',
+              root + 'vendor/pdfmake.min.js',root + 'vendor/vfs_fonts.js',
+              root + 'src/gr/shift.js',root + 'src/gr/weekly.js',
+              root + 'src/catalog/procedures/catalog.js',
+          }
+          safe = {
+              root + 'assets/procedure-center/all01/' + x + '.webp'
+              for x in ('all01-teledata-menu','all01-fault-history','all01-alarm-history',
+                        'all01-flowchart','all01-water-reset-palazzo-a')
+          }
+          needed.update(safe)
+          if not needed.issubset(names):
+              raise SystemExit('FAIL: required runtime or reviewed media is absent from ZIP.')
+          for name in names:
+              if not name.startswith(root) or '..' in PurePosixPath(name).parts:
+                  raise SystemExit('FAIL: invalid archive path.')
+              relative = name[len(root):]
+              if relative.startswith('assets/') and name not in safe:
+                  raise SystemExit('FAIL: original or unreviewed image included.')
+              if relative.startswith(('src/','ui/','vendor/')):
+                  ext = PurePosixPath(relative).suffix.lower()
+                  allowed = ('.js','.css') if relative.startswith('src/') else (('.css',) if relative.startswith('ui/') else ('.js',))
+                  if ext not in allowed:
+                      raise SystemExit('FAIL: unreviewed runtime file type included.')
+              elif name not in needed:
+                  raise SystemExit('FAIL: a non-runtime root file was packaged.')
+          if len(names) < 190:
+              raise SystemExit('FAIL: company package unexpectedly incomplete.')
+          print('PASS: offline company ZIP validated; private files are not published.')
+          PY
+
       - name: Verify tracked source remained unchanged
         shell: bash
         run: |
@@ -153,8 +206,8 @@ jobs:
         if: always()
         shell: bash
         run: |
-          rm -rf private-src
-          rm -f "$RUNNER_TEMP"/shift-report-check.log "$RUNNER_TEMP"/shift-report-test-list.txt "$RUNNER_TEMP"/shift-report-private-test.log
+          rm -rf private-src "$RUNNER_TEMP"/company-package
+          rm -f "$RUNNER_TEMP"/shift-report-check.log "$RUNNER_TEMP"/shift-report-test-list.txt "$RUNNER_TEMP"/shift-report-private-test.log "$RUNNER_TEMP"/company-package-build.log
 
 # Public CI executes only an immutable reviewed private revision.
 # No customer data, OneDrive, artifacts, caches, test output, or private source publication.
