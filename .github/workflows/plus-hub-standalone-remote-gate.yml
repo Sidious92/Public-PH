@@ -1,0 +1,100 @@
+name: PLUS HUB - Standalone remote regression gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'Reviewed 40-hex commit SHA from the private PLUS-HUB repository'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: plus-hub-standalone-test-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  standalone-regression:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    name: Node 22 full synthetic regressions (no corporate data, no deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - name: Validate trusted exact commit input and read-only token
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          TOKEN_CONFIGURED: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'FAIL: Invalid SHA input.'
+            exit 1
+          fi
+          test "$TOKEN_CONFIGURED" = 'true' || { echo 'FAIL: Private read token not configured.'; exit 1; }
+
+      - name: Checkout only PLUS-HUB private source at the reviewed SHA
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: ${{ inputs.source_sha }}
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+          sparse-checkout: |
+            apps
+            modules
+            packages
+            tests
+            tools
+            db
+            home-lab
+            docs
+            schemas
+          sparse-checkout-cone-mode: true
+          path: private-src
+
+      - name: Setup Node.js 22 (no third-party package installation)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Confirm immutable source and test entrypoint
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
+          test -f private-src/package.json
+          test -f private-src/tests/architecture/import-boundaries.test.mjs
+          test -f private-src/tests/planner-domain/engine-baseline.test.mjs
+          echo 'Verified pinned PLUS-HUB revision and test entrypoints.'
+
+      - name: Run full PLUS-HUB synthetic test suite without publishing raw logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm test) > "$RUNNER_TEMP/private-test-results.log" 2>&1; then
+            echo 'PASS: PLUS-HUB full synthetic Node 22 regression suite for reviewed SHA.'
+          else
+            echo 'FAIL: PLUS-HUB regression suite (private logs deliberately withheld).'
+            exit 1
+          fi
+
+      - name: Confirm tests did not modify tracked private code
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C private-src status --porcelain --untracked-files=no)"
+          echo 'Verified source tree unchanged.'
+
+# Manual default-branch execution ONLY. No source artifacts, raw logs, writes,
+# data, credentials, releases or deployments are published by this workflow.
+# The SHA must be reviewed by the owner BEFORE entering it in Run workflow.
+# Does NOT certify PostgreSQL, browser E2E, IAM, IT approval or production.
