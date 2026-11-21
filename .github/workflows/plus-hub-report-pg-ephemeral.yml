@@ -1,0 +1,123 @@
+name: PLUS HUB - Report PostgreSQL ephemeral integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'Reviewed 40-hex private PLUS-HUB commit SHA'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-ph-report-pg-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  disposable-report-pg:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: fixture_report_test
+          POSTGRES_PASSWORD: fixture_report_test_only
+          POSTGRES_DB: plus_hub_report_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd 'pg_isready -U fixture_report_test -d plus_hub_report_test'
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      PLUS_HUB_EPHEMERAL_REPORT_PG: 'yes'
+      PGHOST: '127.0.0.1'
+      PGPORT: '5432'
+      PGDATABASE: 'plus_hub_report_test'
+      PGUSER: 'fixture_report_test'
+      PGPASSWORD: 'fixture_report_test_only'
+    steps:
+      - name: Validate trusted SHA and private read-only checkout token
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          TOKEN_CONFIGURED: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]] || { echo 'FAIL: invalid SHA'; exit 1; }
+          [[ "$TOKEN_CONFIGURED" == 'true' ]] || { echo 'FAIL: missing private read token'; exit 1; }
+
+      - name: Checkout reviewed private PLUS-HUB revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: ${{ inputs.source_sha }}
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          lfs: false
+          submodules: false
+          sparse-checkout: |
+            apps
+            modules
+            packages
+            tests
+            tools
+            db
+          sparse-checkout-cone-mode: true
+          path: private-src
+
+      - name: Install Node 22 without caching dependencies
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Verify commit and dedicated disposable DB test
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
+          test -f private-src/tests/report-postgres/handover-driver-integration.mjs
+          test -f private-src/db/report/handover-schema-review.sql
+          test -f private-src/apps/shift-report-bff/src/postgres-handover-runatomic.mjs
+          echo 'Verified pinned revision and expected synthetic PostgreSQL test targets.'
+
+      - name: Install only reviewed pinned workspace dependencies (no scripts)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && npm install --ignore-scripts --no-audit --no-fund --package-lock=false) > "$RUNNER_TEMP/private-install.log" 2>&1; then
+            echo 'PASS: reviewed workspace dependencies installed.'
+          else
+            echo 'FAIL: private dependency installation; raw logs withheld.'
+            exit 1
+          fi
+
+      - name: Test Report BFF, real PostgreSQL CAS, receipt and two processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && node tests/report-postgres/handover-driver-integration.mjs) > "$RUNNER_TEMP/private-report-pg.log" 2>&1; then
+            echo 'PASS: dedicated synthetic Report PostgreSQL 16 integration.'
+          else
+            echo 'FAIL: dedicated synthetic Report PostgreSQL integration; raw logs withheld.'
+            exit 1
+          fi
+
+      - name: Check private source files remain unchanged
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git -C private-src status --porcelain --untracked-files=no)"
+
+# The job uses a GitHub-hosted isolated PostgreSQL SERVICE, never a corporate VM.
+# No artifacts, uploads, production credentials or raw private source logs.
+# Manual reviewed source SHA ONLY; risk of running malicious source in CI remains.
