@@ -29,7 +29,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && 'a207bad1220b43bfd6d9c0899be7382644ea9a35' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && 'a207bad1220b43bfd6d9c0899be7382644ea9a35' || inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -68,7 +68,7 @@ jobs:
       - name: Confirm reviewed commit, committed lockfile and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && 'a207bad1220b43bfd6d9c0899be7382644ea9a35' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -203,7 +203,7 @@ jobs:
           test -z "$(git -C private-src status --porcelain --untracked-files=no)"
           echo 'PASS: no tracked source modifications.'
 
-# ONE-SHOT M2 source SHA a207bad1220b43bfd6d9c0899be7382644ea9a35. Restore manual-only after runs.
+# ONE-SHOT M2 source SHA 2450dfc0de32fca1f2cea749e9bb7d9ef3e43566. Restore manual-only after runs.
 # Candidate developer gate only. No company data, no deployment, no public
 # source/log artifacts. Uses the reviewed committed lockfile from PLUS-HUB.
 # This gate never asserts IAM, real PostgreSQL, HOME QA, or enterprise GO.
