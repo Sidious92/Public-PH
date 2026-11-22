@@ -1,10 +1,6 @@
 name: PLUS HUB - Node 26 React TypeScript Vite stack gate
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/plus-hub-stack-node26-react-ts.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -21,7 +17,7 @@ concurrency:
 
 jobs:
   react-stack:
-    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     name: Node 26 + npm 12 + React 19 + TS 7 + Vite 8 synthetic-only
     runs-on: ubuntu-latest
     timeout-minutes: 28
@@ -29,7 +25,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -40,7 +36,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -68,7 +64,7 @@ jobs:
       - name: Confirm reviewed commit, committed lockfile and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -106,20 +102,6 @@ jobs:
             echo 'PASS: clean npm ci reproduces the committed private lockfile.'
           else
             echo 'FAIL: committed lock incompatible with npm ci; private logs withheld.'
-            exit 1
-          fi
-
-      - name: Diagnose candidate M2 tests without private logs
-        shell: bash
-        run: |
-          set -euo pipefail
-          code=0
-          (cd private-src && node --test tests/report-domain/operations.test.mjs tests/report-bff/operations-commands.test.mjs) > "$RUNNER_TEMP/m2-unit.log" 2>&1 || code=$?
-          if [ "$code" -eq 0 ]; then
-            echo 'PASS: M2 unit test suite isolated.'
-          else
-            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.env.RUNNER_TEMP+"/m2-unit.log","utf8");const failures=[...s.matchAll(/^not ok ([0-9]+) - ([^\r\n]+)/gm)].map(m=>({index:Number(m[1]),test:m[2].slice(0,90)}));const codes=[...new Set([...s.matchAll(/^\s*code: (.+)$/gm)].map(m=>m[1].slice(0,40)))];const types=[...new Set([...s.matchAll(/^\s*error: (.+)$/gm)].map(m=>m[1].slice(0,70)))];console.log("M2 isolated diagnostic: "+JSON.stringify({failures,codes,types}));'
-            echo 'FAIL: M2 isolated suite (raw log withheld)'
             exit 1
           fi
 
@@ -203,7 +185,6 @@ jobs:
           test -z "$(git -C private-src status --porcelain --untracked-files=no)"
           echo 'PASS: no tracked source modifications.'
 
-# ONE-SHOT M2 source SHA 2450dfc0de32fca1f2cea749e9bb7d9ef3e43566. Restore manual-only after runs.
 # Candidate developer gate only. No company data, no deployment, no public
 # source/log artifacts. Uses the reviewed committed lockfile from PLUS-HUB.
 # This gate never asserts IAM, real PostgreSQL, HOME QA, or enterprise GO.
