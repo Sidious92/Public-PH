@@ -109,6 +109,23 @@ jobs:
             exit 1
           fi
 
+      - name: Isolate M3 tests and print only sanitized failure metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=0
+          (cd private-src && node --test \
+            tests/home-lab/report-operations-lab.test.mjs \
+            tests/report-bff/operations-feed.test.mjs \
+            tests/report-domain/checklist-m3-template-parity.test.mjs) > "$RUNNER_TEMP/m3-tests.log" 2>&1 || code=$?
+          if [ "$code" -eq 0 ]; then
+            echo 'PASS: M3 isolated regression suite.'
+          else
+            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.env.RUNNER_TEMP+"/m3-tests.log","utf8");const fail=[...s.matchAll(/^not ok (\d+) - ([^\r\n]+)/gm)].map(m=>({n:+m[1],title:m[2].slice(0,95)}));const types=[...new Set([...s.matchAll(/^\s*error: (.+)$/gm)].map(m=>m[1].slice(0,80)))];const codes=[...new Set([...s.matchAll(/^\s*code: (.+)$/gm)].map(m=>m[1].slice(0,40)))];console.log("M3 sanitized diagnostics: "+JSON.stringify({fail,types,codes}));'
+            echo 'FAIL: M3 isolated suite (private raw logs withheld).'
+            exit 1
+          fi
+
       - name: Run all existing PLUS-HUB Node 26 regressions
         shell: bash
         run: |
