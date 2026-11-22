@@ -29,7 +29,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '3ad7dedf34f37b48447d6d7eaf8c5cbc510e80d3' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'c83abab83abca4871d8333d139be3369a930e6c9' || inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && '3ad7dedf34f37b48447d6d7eaf8c5cbc510e80d3' || inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && 'c83abab83abca4871d8333d139be3369a930e6c9' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -68,7 +68,7 @@ jobs:
       - name: Confirm reviewed commit, lock-free DEV candidate and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '3ad7dedf34f37b48447d6d7eaf8c5cbc510e80d3' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'c83abab83abca4871d8333d139be3369a930e6c9' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -133,6 +133,9 @@ jobs:
           if (cd private-src && npm run build:report) > "$RUNNER_TEMP/private-ts-vite.log" 2>&1; then
             echo 'PASS: TypeScript 7 strict typecheck and Vite 8 build.'
           else
+            # Print ONLY diagnostic TS numbers and counts, never source excerpts,
+            # paths, commands, code snippets or private build logs.
+            node -e 'const fs=require("node:fs"); const source=fs.readFileSync(process.env.RUNNER_TEMP+"/private-ts-vite.log","utf8"); const counts={}; for(const m of source.matchAll(/error TS([0-9]{4,5})/g)){ const k="TS"+m[1]; counts[k]=(counts[k]||0)+1; } console.log("Sanitized compiler diagnostics: "+(Object.keys(counts).length?JSON.stringify(counts):"none (build-tool failure)"));'
             echo 'FAIL: TypeScript/Vite build; private logs withheld.'
             exit 1
           fi
@@ -181,7 +184,7 @@ jobs:
           echo 'PASS: no tracked source modifications.'
 
 # ONE-SHOT PUSH TRIGGER TEMPORARY: only this file on Public-PH/main, exact reviewed
-# private SHA 3ad7dedf34f37b48447d6d7eaf8c5cbc510e80d3. REMOVE push trigger and pinned expression after run.
+# private SHA c83abab83abca4871d8333d139be3369a930e6c9. REMOVE push trigger and pinned expression after run.
 # Candidate developer gate only. No company data, no deployment, no public
 # source/log artifacts. npm dependency tree is UNLOCKED until review/lockfile.
 # This gate never asserts IAM, real PostgreSQL, HOME QA, or enterprise GO.
