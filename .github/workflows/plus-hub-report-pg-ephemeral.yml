@@ -1,6 +1,10 @@
 name: PLUS HUB - Report PostgreSQL ephemeral integration
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/plus-hub-report-pg-ephemeral.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -17,7 +21,7 @@ concurrency:
 
 jobs:
   disposable-report-pg:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     runs-on: ubuntu-latest
     timeout-minutes: 18
     services:
@@ -45,7 +49,7 @@ jobs:
       - name: Validate trusted SHA and private read-only checkout token
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
           TOKEN_CONFIGURED: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -56,7 +60,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -72,16 +76,16 @@ jobs:
           sparse-checkout-cone-mode: true
           path: private-src
 
-      - name: Install Node 22 without caching dependencies
+      - name: Install Node 26 LTS without caching dependencies
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '26'
           package-manager-cache: false
 
       - name: Verify commit and dedicated disposable DB test
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -90,16 +94,39 @@ jobs:
           test -f private-src/apps/shift-report-bff/src/postgres-handover-runatomic.mjs
           echo 'Verified pinned revision and expected synthetic PostgreSQL test targets.'
 
-      - name: Install only reviewed pinned workspace dependencies (no scripts)
+      - name: Install exact npm 12.2.3 without lifecycle scripts
         shell: bash
         run: |
           set -euo pipefail
-          if (cd private-src && npm install --ignore-scripts --no-audit --no-fund --package-lock=false) > "$RUNNER_TEMP/private-install.log" 2>&1; then
-            echo 'PASS: reviewed workspace dependencies installed.'
+          if npm install -g npm@12.2.3 --ignore-scripts --no-audit --no-fund > "$RUNNER_TEMP/npm12-install.log" 2>&1; then
+            test "$(npm --version)" = '12.2.3'
+            echo 'PASS: Node 26 with npm 12.2.3.'
           else
-            echo 'FAIL: private dependency installation; raw logs withheld.'
+            echo 'FAIL: npm CLI setup, private logs withheld.'
             exit 1
           fi
+
+      - name: Install from reviewed committed private lockfile only
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f private-src/package-lock.json
+          git -C private-src ls-files --error-unmatch package-lock.json > /dev/null
+          cp private-src/package-lock.json "$RUNNER_TEMP/committed-report-lock.json"
+          if (cd private-src && npm ci --ignore-scripts --no-audit --no-fund) > "$RUNNER_TEMP/private-install.log" 2>&1; then
+            cmp -s "$RUNNER_TEMP/committed-report-lock.json" private-src/package-lock.json
+            echo 'PASS: PG16 test dependencies installed from committed immutable lockfile.'
+          else
+            echo 'FAIL: npm ci on committed lock, private logs withheld.'
+            exit 1
+          fi
+
+      - name: Verify Node 26 active on the PostgreSQL test runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p 'process.versions.node.split(".")[0]')" = '26'
+          echo 'PASS: Node 26 runner verified.'
 
       - name: Test Report BFF, real PostgreSQL CAS, receipt and two processes
         shell: bash
@@ -120,4 +147,6 @@ jobs:
 
 # The job uses a GitHub-hosted isolated PostgreSQL SERVICE, never a corporate VM.
 # No artifacts, uploads, production credentials or raw private source logs.
+# Temporary one-shot push trigger pinning private source SHA c91f25b42cc4b19cff0519949cf89d9ec24ee7e4.
+# Remove push and exact SHA when the review run has finished.
 # Manual reviewed source SHA ONLY; risk of running malicious source in CI remains.
