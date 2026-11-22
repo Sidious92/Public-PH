@@ -109,6 +109,18 @@ jobs:
             exit 1
           fi
 
+      - name: Isolate macro M1 characterization tests (sanitized errors)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if (cd private-src && node --test tests/report-domain/report-workspace-preview.test.mjs) > "$RUNNER_TEMP/report-m1-test.log" 2>&1; then
+            echo 'PASS: macro M1 tests isolated.'
+          else
+            node -e 'const fs=require("node:fs"); const s=fs.readFileSync(process.env.RUNNER_TEMP+"/report-m1-test.log","utf8"); const failed=[...s.matchAll(/^not ok ([0-9]+) - ([^\r\n]+)/gm)].map(m=>({index:Number(m[1]),test:m[2].slice(0,85)})); const codes=[...new Set([...s.matchAll(/^\s*code: (.+)$/gm)].map(m=>m[1].slice(0,60)))]; const types=[...new Set([...s.matchAll(/^\s*error: (.+)$/gm)].map(m=>m[1].slice(0,80)))]; console.log("M1 diagnostic (only test names, code, short errors): "+JSON.stringify({failed,codes,types}));'
+            echo 'FAIL: macro M1 tests; private raw log withheld.'
+            exit 1
+          fi
+
       - name: Run all existing PLUS-HUB Node 26 regressions
         shell: bash
         run: |
