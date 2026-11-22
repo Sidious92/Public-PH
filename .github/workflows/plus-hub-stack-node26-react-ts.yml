@@ -29,7 +29,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '7ea6c1f625eb62e1489d1422ac921a334068e724' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '201e2a6e97f01702e0127dc8f3082bec0d203622' || inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -40,7 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && '7ea6c1f625eb62e1489d1422ac921a334068e724' || inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && '201e2a6e97f01702e0127dc8f3082bec0d203622' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -68,7 +68,7 @@ jobs:
       - name: Confirm reviewed commit, committed lockfile and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '7ea6c1f625eb62e1489d1422ac921a334068e724' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '201e2a6e97f01702e0127dc8f3082bec0d203622' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -142,6 +142,9 @@ jobs:
             # Print ONLY diagnostic TS numbers and counts, never source excerpts,
             # paths, commands, code snippets or private build logs.
             node -e 'const fs=require("node:fs"); const source=fs.readFileSync(process.env.RUNNER_TEMP+"/private-ts-vite.log","utf8"); const counts={}; for(const m of source.matchAll(/error TS([0-9]{4,5})/g)){ const k="TS"+m[1]; counts[k]=(counts[k]||0)+1; } console.log("Sanitized compiler diagnostics: "+(Object.keys(counts).length?JSON.stringify(counts):"none (build-tool failure)"));'
+            # Emit only basename, line and column of compiler diagnostics.
+            # Never display private source lines, full paths or raw compiler logs.
+            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.env.RUNNER_TEMP+"/private-ts-vite.log","utf8");const out=[...s.matchAll(/^(.+?\.(?:tsx?|jsx?))\((\d+),(\d+)\): error (TS\d+)/gm)].map(m=>({file:m[1].split("/").pop(),line:Number(m[2]),column:Number(m[3]),code:m[4]}));console.log("TypeScript diagnostic positions: "+JSON.stringify(out.slice(0,15)));'
             echo 'FAIL: TypeScript/Vite build; private logs withheld.'
             exit 1
           fi
@@ -198,7 +201,7 @@ jobs:
           test -z "$(git -C private-src status --porcelain --untracked-files=no)"
           echo 'PASS: no tracked source modifications.'
 
-# ONE-SHOT REPORT M1 PR74 7ea6c1f625eb62e1489d1422ac921a334068e724; remove push after run.
+# ONE-SHOT REPORT M1 PR74 201e2a6e97f01702e0127dc8f3082bec0d203622; remove push after run.
 # Candidate developer gate only. No company data, no deployment, no public
 # source/log artifacts. Uses the reviewed committed lockfile from PLUS-HUB.
 # This gate never asserts IAM, real PostgreSQL, HOME QA, or enterprise GO.
