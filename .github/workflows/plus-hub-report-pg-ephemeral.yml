@@ -49,7 +49,7 @@ jobs:
       - name: Validate trusted SHA and private read-only checkout token
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && 'a207bad1220b43bfd6d9c0899be7382644ea9a35' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
           TOKEN_CONFIGURED: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && 'a207bad1220b43bfd6d9c0899be7382644ea9a35' || inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -85,7 +85,7 @@ jobs:
       - name: Verify commit and dedicated disposable DB test
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && 'a207bad1220b43bfd6d9c0899be7382644ea9a35' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '2450dfc0de32fca1f2cea749e9bb7d9ef3e43566' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -147,6 +147,6 @@ jobs:
 
 # The job uses a GitHub-hosted isolated PostgreSQL SERVICE, never a corporate VM.
 # No artifacts, uploads, production credentials or raw private source logs.
-# ONE-SHOT M2 source SHA a207bad1220b43bfd6d9c0899be7382644ea9a35. Restore manual-only after runs.
+# ONE-SHOT M2 source SHA 2450dfc0de32fca1f2cea749e9bb7d9ef3e43566. Restore manual-only after runs.
 # Manual reviewed source SHA ONLY; risk of running malicious source in CI remains.
 # Node 26/npm 12 must install from the committed private npm lockfile.
