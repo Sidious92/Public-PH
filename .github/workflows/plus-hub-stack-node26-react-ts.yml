@@ -109,20 +109,28 @@ jobs:
             exit 1
           fi
 
-      - name: Isolate M3 tests and print only sanitized failure metadata
+      - name: Diagnose each M3 test file without source or stack logs
         shell: bash
         run: |
           set -euo pipefail
-          code=0
-          (cd private-src && node --test \
+          any=0
+          for f in \
             tests/home-lab/report-operations-lab.test.mjs \
             tests/report-bff/operations-feed.test.mjs \
-            tests/report-domain/checklist-m3-template-parity.test.mjs) > "$RUNNER_TEMP/m3-tests.log" 2>&1 || code=$?
-          if [ "$code" -eq 0 ]; then
-            echo 'PASS: M3 isolated regression suite.'
-          else
-            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.env.RUNNER_TEMP+"/m3-tests.log","utf8");const fail=[...s.matchAll(/^not ok (\d+) - ([^\r\n]+)/gm)].map(m=>({n:+m[1],title:m[2].slice(0,95)}));const types=[...new Set([...s.matchAll(/^\s*error: (.+)$/gm)].map(m=>m[1].slice(0,80)))];const codes=[...new Set([...s.matchAll(/^\s*code: (.+)$/gm)].map(m=>m[1].slice(0,40)))];console.log("M3 sanitized diagnostics: "+JSON.stringify({fail,types,codes}));'
-            echo 'FAIL: M3 isolated suite (private raw logs withheld).'
+            tests/report-domain/checklist-m3-template-parity.test.mjs; do
+            logfile="$RUNNER_TEMP/$(basename "$f").tap"
+            code=0
+            (cd private-src && node --test --test-reporter=tap "$f") > "$logfile" 2>&1 || code=$?
+            if [ "$code" -eq 0 ]; then
+              echo "PASS M3 file: $(basename "$f")"
+            else
+              echo "FAIL M3 file: $(basename "$f")"
+              M3_LOG="$logfile" node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.env.M3_LOG,"utf8");const fails=[...s.matchAll(/^\s*not ok\s+\d+\s*-\s+([^\r\n]+)/gm)].map(m=>m[1].slice(0,100));const codes=[...new Set([...s.matchAll(/^\s*(?:#\s*)?code:\s*(.+)$/gm)].map(m=>m[1].slice(0,50)))];const ops=[...new Set([...s.matchAll(/^\s*(?:#\s*)?operator:\s*(.+)$/gm)].map(m=>m[1].slice(0,40)))];console.log("M3 TAP sanitized failures: "+JSON.stringify({fails,codes,ops}));'
+              any=1
+            fi
+          done
+          if [ "$any" -ne 0 ]; then
+            echo 'FAIL M3 regression files (private raw logs withheld).'
             exit 1
           fi
 
