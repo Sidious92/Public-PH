@@ -109,6 +109,20 @@ jobs:
             exit 1
           fi
 
+      - name: Diagnose candidate M2 tests without private logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=0
+          (cd private-src && node --test tests/report-domain/operations.test.mjs tests/report-bff/operations-commands.test.mjs) > "$RUNNER_TEMP/m2-unit.log" 2>&1 || code=$?
+          if [ "$code" -eq 0 ]; then
+            echo 'PASS: M2 unit test suite isolated.'
+          else
+            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.env.RUNNER_TEMP+"/m2-unit.log","utf8");const failures=[...s.matchAll(/^not ok ([0-9]+) - ([^\r\n]+)/gm)].map(m=>({index:Number(m[1]),test:m[2].slice(0,90)}));const codes=[...new Set([...s.matchAll(/^\s*code: (.+)$/gm)].map(m=>m[1].slice(0,40)))];const types=[...new Set([...s.matchAll(/^\s*error: (.+)$/gm)].map(m=>m[1].slice(0,70)))];console.log("M2 isolated diagnostic: "+JSON.stringify({failures,codes,types}));'
+            echo 'FAIL: M2 isolated suite (raw log withheld)'
+            exit 1
+          fi
+
       - name: Run all existing PLUS-HUB Node 26 regressions
         shell: bash
         run: |
