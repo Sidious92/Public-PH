@@ -89,14 +89,25 @@ jobs:
             exit 1
           fi
 
-      - name: Install pinned direct workspace dependencies without lifecycle scripts
+      - name: Resolve disposable npm lockfile and verify clean npm ci install
         shell: bash
         run: |
           set -euo pipefail
-          if (cd private-src && npm install --ignore-scripts --no-audit --no-fund --package-lock=false) > "$RUNNER_TEMP/dependency-install.log" 2>&1; then
-            echo 'PASS: synthetic-only workspace dependencies installed.'
+          # DEV gate only: the repository still needs a reviewed committed
+          # package-lock.json before release. Never print private lockfiles.
+          if (cd private-src && npm install --package-lock-only --ignore-scripts --no-audit --no-fund) > "$RUNNER_TEMP/dependency-lock.log" 2>&1; then
+            test -f private-src/package-lock.json
+            cp private-src/package-lock.json "$RUNNER_TEMP/npm-resolved.lock"
+            echo 'PASS: npm 12 resolved an ephemeral workspace lockfile.'
           else
-            echo 'FAIL: dependency resolution; private logs withheld.'
+            echo 'FAIL: npm dependency resolution; private logs withheld.'
+            exit 1
+          fi
+          if (cd private-src && npm ci --ignore-scripts --no-audit --no-fund) > "$RUNNER_TEMP/dependency-install.log" 2>&1; then
+            cmp -s "$RUNNER_TEMP/npm-resolved.lock" private-src/package-lock.json
+            echo 'PASS: clean npm ci matches the resolved lock exactly.'
+          else
+            echo 'FAIL: clean npm ci; private logs withheld.'
             exit 1
           fi
 
