@@ -49,7 +49,7 @@ jobs:
       - name: Validate trusted SHA and private read-only checkout token
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '409449fbe68cbf77614a9f0bb8e83b28dd7e411d' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '1381a3a723d774c90cb520d1f41ffd90b0b82aef' || inputs.source_sha }}
           TOKEN_CONFIGURED: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && '409449fbe68cbf77614a9f0bb8e83b28dd7e411d' || inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && '1381a3a723d774c90cb520d1f41ffd90b0b82aef' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -85,7 +85,7 @@ jobs:
       - name: Verify commit and dedicated disposable DB test
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '409449fbe68cbf77614a9f0bb8e83b28dd7e411d' || inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '1381a3a723d774c90cb520d1f41ffd90b0b82aef' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -147,6 +147,6 @@ jobs:
 
 # The job uses a GitHub-hosted isolated PostgreSQL SERVICE, never a corporate VM.
 # No artifacts, uploads, production credentials or raw private source logs.
-# ONE-SHOT M3 source SHA 409449fbe68cbf77614a9f0bb8e83b28dd7e411d. Remove temporary push after runs.
+# ONE-SHOT M3 source SHA 1381a3a723d774c90cb520d1f41ffd90b0b82aef. Remove temporary push after runs.
 # Manual reviewed source SHA ONLY; risk of running malicious source in CI remains.
 # Node 26/npm 12 must install from the committed private npm lockfile.
