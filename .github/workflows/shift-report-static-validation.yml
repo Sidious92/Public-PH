@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      SOURCE_SHA: 0234da099b82162a88ce9f5b2aa555810d49f004
+      SOURCE_SHA: 1db3b8db4ac62d45c85f3ee44f2255381a9c17c5
     steps:
       - name: Confirm read-only source access is configured
         shell: bash
@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/Shift-Report-New
-          ref: 0234da099b82162a88ce9f5b2aa555810d49f004
+          ref: 1db3b8db4ac62d45c85f3ee44f2255381a9c17c5
           token: ${{ secrets.PUBLIC_PH_X_SHIFT_REPORT_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
