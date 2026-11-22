@@ -1,6 +1,10 @@
 name: PLUS HUB - Node 26 React TypeScript Vite stack gate
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/plus-hub-stack-node26-react-ts.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -17,7 +21,7 @@ concurrency:
 
 jobs:
   react-stack:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     name: Node 26 + npm 12 + React 19 + TS 7 + Vite 8 synthetic-only
     runs-on: ubuntu-latest
     timeout-minutes: 28
@@ -25,7 +29,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -36,7 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -64,7 +68,7 @@ jobs:
       - name: Confirm reviewed commit, lock-free DEV candidate and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -89,25 +93,19 @@ jobs:
             exit 1
           fi
 
-      - name: Resolve disposable npm lockfile and verify clean npm ci install
+      - name: Verify committed npm lockfile and clean npm ci (no regeneration)
         shell: bash
         run: |
           set -euo pipefail
-          # DEV gate only: the repository still needs a reviewed committed
-          # package-lock.json before release. Never print private lockfiles.
-          if (cd private-src && npm install --package-lock-only --ignore-scripts --no-audit --no-fund) > "$RUNNER_TEMP/dependency-lock.log" 2>&1; then
-            test -f private-src/package-lock.json
-            cp private-src/package-lock.json "$RUNNER_TEMP/npm-resolved.lock"
-            echo 'PASS: npm 12 resolved an ephemeral workspace lockfile.'
-          else
-            echo 'FAIL: npm dependency resolution; private logs withheld.'
-            exit 1
-          fi
+          test -f private-src/package-lock.json || { echo 'FAIL: committed npm lockfile absent'; exit 1; }
+          git -C private-src ls-files --error-unmatch package-lock.json > /dev/null
+          node -e 'const p=require("./private-src/package-lock.json"); if(p.lockfileVersion!==3 || !p.packages?.[""] || !p.packages?.["apps/shift-report-web"]) process.exit(1)'
+          cp private-src/package-lock.json "$RUNNER_TEMP/committed-npm-lock.json"
           if (cd private-src && npm ci --ignore-scripts --no-audit --no-fund) > "$RUNNER_TEMP/dependency-install.log" 2>&1; then
-            cmp -s "$RUNNER_TEMP/npm-resolved.lock" private-src/package-lock.json
-            echo 'PASS: clean npm ci matches the resolved lock exactly.'
+            cmp -s "$RUNNER_TEMP/committed-npm-lock.json" private-src/package-lock.json || { echo 'FAIL: committed lockfile changed by install'; exit 1; }
+            echo 'PASS: clean npm ci reproduces the committed private lockfile.'
           else
-            echo 'FAIL: clean npm ci; private logs withheld.'
+            echo 'FAIL: committed lock incompatible with npm ci; private logs withheld.'
             exit 1
           fi
 
@@ -135,6 +133,15 @@ jobs:
             echo 'FAIL: TypeScript/Vite build; private logs withheld.'
             exit 1
           fi
+
+      - name: Audit dependency tree without exposing private reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          audit_exit=0
+          (cd private-src && npm audit --audit-level=high --json) > "$RUNNER_TEMP/npm-audit-private.json" 2>&1 || audit_exit=$?
+          AUDIT_CODE="$audit_exit" node -e 'const fs=require("node:fs");try{const p=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/npm-audit-private.json","utf8"));const v=p.metadata?.vulnerabilities; if(!v||typeof v.high!=="number"||typeof v.critical!=="number")process.exit(3);console.log("Dependency audit totals (no private package names): "+JSON.stringify({low:v.low,moderate:v.moderate,high:v.high,critical:v.critical}));if(v.high>0||v.critical>0)process.exit(2);if(process.env.AUDIT_CODE!=="0")process.exit(4);}catch(e){if(e?.code==="MODULE_NOT_FOUND")throw e;console.log("FAIL: invalid npm audit report");process.exit(3);}'
+          echo 'PASS: npm audit reports no high/critical vulnerabilities.'
 
       - name: Inspect generated bundle and deny runtime private fixtures
         shell: bash
@@ -179,6 +186,8 @@ jobs:
           test -z "$(git -C private-src status --porcelain --untracked-files=no)"
           echo 'PASS: no tracked source modifications.'
 
+# One-shot push only for committed lockfile at reviewed PLUS-HUB SHA c91f25b42cc4b19cff0519949cf89d9ec24ee7e4.
+# Remove temporary push event and pin expressions immediately after this run.
 # Candidate developer gate only. No company data, no deployment, no public
 # source/log artifacts. npm dependency tree is UNLOCKED until review/lockfile.
 # This gate never asserts IAM, real PostgreSQL, HOME QA, or enterprise GO.
