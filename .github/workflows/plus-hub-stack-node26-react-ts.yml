@@ -1,10 +1,6 @@
 name: PLUS HUB - Node 26 React TypeScript Vite stack gate
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/plus-hub-stack-node26-react-ts.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -21,7 +17,7 @@ concurrency:
 
 jobs:
   react-stack:
-    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     name: Node 26 + npm 12 + React 19 + TS 7 + Vite 8 synthetic-only
     runs-on: ubuntu-latest
     timeout-minutes: 28
@@ -29,7 +25,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -40,7 +36,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -65,10 +61,10 @@ jobs:
           node-version: '26'
           package-manager-cache: false
 
-      - name: Confirm reviewed commit, lock-free DEV candidate and React sources
+      - name: Confirm reviewed commit, committed lockfile and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && 'c91f25b42cc4b19cff0519949cf89d9ec24ee7e4' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -186,8 +182,6 @@ jobs:
           test -z "$(git -C private-src status --porcelain --untracked-files=no)"
           echo 'PASS: no tracked source modifications.'
 
-# One-shot push only for committed lockfile at reviewed PLUS-HUB SHA c91f25b42cc4b19cff0519949cf89d9ec24ee7e4.
-# Remove temporary push event and pin expressions immediately after this run.
 # Candidate developer gate only. No company data, no deployment, no public
-# source/log artifacts. npm dependency tree is UNLOCKED until review/lockfile.
+# source/log artifacts. Uses the reviewed committed lockfile from PLUS-HUB.
 # This gate never asserts IAM, real PostgreSQL, HOME QA, or enterprise GO.
