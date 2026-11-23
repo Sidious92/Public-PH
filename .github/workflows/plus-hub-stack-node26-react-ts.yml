@@ -118,7 +118,7 @@ jobs:
           else
             # Print ONLY stable FNV fingerprints of failed TAP test titles, never
             # source paths, test names, assertion messages, fixture data or logs.
-            node -e 'const fs=require("node:fs");const x=fs.readFileSync(process.env.RUNNER_TEMP+"/private-node-tests.log","utf8");const m=[...x.matchAll(/^\\s*not ok\\s+\\d+\\s+-\\s+(.+)$/gm)];const hash=v=>{let h=2166136261;for(const c of v)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h.toString(16).padStart(8,"0")};const ids=m.map(y=>hash(y[1].replace(/^.*\\/tests\\//,"tests/").trim()));console.log("FAIL: sanitized TAP fingerprints="+(ids.length?ids.join(","):"none"));console.log("Diagnostic flags="+JSON.stringify({syntax:x.includes("SyntaxError"),assertion:x.includes("ERR_ASSERTION"),missing:x.includes("ERR_MODULE_NOT_FOUND"),count:ids.length}));'
+            node -e 'const fs=require("node:fs");const x=fs.readFileSync(process.env.RUNNER_TEMP+"/private-node-tests.log","utf8");const m=x.split(String.fromCharCode(10)).map(s=>s.trim()).filter(s=>s.startsWith("not ok "));const hash=v=>{let h=2166136261;for(const c of v)h=Math.imul(h^c.charCodeAt(0),16777619)>>>0;return h.toString(16).padStart(8,"0")};const ids=m.map(v=>{const raw=v.slice(v.indexOf(" - ")+3);const name=raw.includes("tests/")?"tests/"+raw.split("tests/").at(-1):raw;return hash(name)});console.log("FAIL: sanitized TAP fingerprints="+(ids.length?ids.join(","):"none"));console.log("Diagnostic flags="+JSON.stringify({syntax:x.includes("SyntaxError"),assertion:x.includes("ERR_ASSERTION"),missing:x.includes("ERR_MODULE_NOT_FOUND"),count:ids.length}));'
             exit 1
           fi
 
