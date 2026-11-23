@@ -1,10 +1,6 @@
 name: PLUS HUB - Node 26 React TypeScript Vite stack gate
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/plus-hub-stack-node26-react-ts.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -21,7 +17,7 @@ concurrency:
 
 jobs:
   react-stack:
-    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     name: Node 26 + npm 12 + React 19 + TS 7 + Vite 8 synthetic-only
     runs-on: ubuntu-latest
     timeout-minutes: 28
@@ -29,7 +25,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '466609507f42a64ecada21f43ad7c811d6095aec' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -40,7 +36,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && '466609507f42a64ecada21f43ad7c811d6095aec' || inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -68,7 +64,7 @@ jobs:
       - name: Confirm reviewed commit, committed lockfile and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '466609507f42a64ecada21f43ad7c811d6095aec' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -116,8 +112,7 @@ jobs:
           if (cd private-src && npm test) > "$RUNNER_TEMP/private-node-tests.log" 2>&1; then
             echo 'PASS: Node 26 complete PLUS-HUB synthetic regression suite.'
           else
-            # Hash-only failure metadata; never disclose test titles, paths, content or fixtures.
-            node -e 'const fs=require("node:fs");const s=fs.readFileSync(process.env.RUNNER_TEMP+"/private-node-tests.log","utf8");const lines=s.split(String.fromCharCode(10));const fail=lines.map(x=>x.trim()).filter(x=>x.startsWith("not ok "));const hash=v=>{let n=2166136261;for(const c of v)n=Math.imul(n^c.charCodeAt(0),16777619)>>>0;return n.toString(16).padStart(8,"0")};console.log("Sanitized failed TAP title fingerprints: "+JSON.stringify(fail.map(x=>hash(x.slice(x.indexOf(" - ")+3)))));console.log("Sanitized flags: "+JSON.stringify({syntax:s.includes("SyntaxError"),assertion:s.includes("ERR_ASSERTION"),type:s.includes("TypeError"),testCount:fail.length}));'
+            echo 'FAIL: Node 26 regressions; raw logs withheld.'
             exit 1
           fi
 
