@@ -96,3 +96,5 @@ jobs:
         shell: bash
         run: |
           rm -rf private-src "$RUNNER_TEMP/work-lab-build.log" "$RUNNER_TEMP/work-lab-npm.log" "$RUNNER_TEMP/encrypted-work-lab"
+
+# Manual rebuild request 2026-11-25: re-encrypt the same pinned candidate after package-key rotation.
