@@ -1,0 +1,98 @@
+name: PLUS HUB - WORK LAB portable (encrypted)
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: 'Reviewed exact private PLUS-HUB commit SHA'
+        required: true
+        type: string
+        default: '8fae1019e3a97a65a649536de4752205c23a5e30'
+  push:
+    branches: [main]
+    paths: ['.github/workflows/work-lab-portable.yml']
+permissions:
+  contents: read
+concurrency:
+  group: work-lab-portable-main
+  cancel-in-progress: false
+jobs:
+  build:
+    if: github.repository == 'Sidious92/Public-PH' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ github.event_name == 'push' && '8fae1019e3a97a65a649536de4752205c23a5e30' || inputs.source_sha }}
+    steps:
+      - name: Validate reviewed source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+      - name: Checkout exact private revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: Sidious92/PLUS-HUB
+          ref: ${{ env.SOURCE_SHA }}
+          token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 1
+          submodules: false
+          lfs: false
+          path: private-src
+      - name: Setup Node 26
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: '26'
+          package-manager-cache: false
+      - name: Compile portable HTML (raw output withheld)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
+          if ! npm install --global npm@12.2.3 --ignore-scripts --no-audit --no-fund > "$RUNNER_TEMP/work-lab-npm.log" 2>&1; then
+            echo 'FAIL: npm CLI setup'; exit 1
+          fi
+          if ! (cd private-src && npm ci --ignore-scripts --no-audit --no-fund && npm install --prefix tools/work-lab --ignore-scripts --no-audit --no-fund && npm run typecheck:report && node tools/work-lab/build.mjs) > "$RUNNER_TEMP/work-lab-build.log" 2>&1; then
+            echo 'FAIL: portable compilation or typecheck; private logs withheld.'; exit 1
+          fi
+          test -s 'private-src/dist-work-lab/APRI QUI.html'
+          echo 'PASS: WORK LAB HTML compiled.'
+      - name: Encrypt offline package (fail closed)
+        id: encrypt
+        shell: bash
+        env:
+          WORK_LAB_PACKAGE_KEY: ${{ secrets.WORK_LAB_PACKAGE_KEY }}
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'WORK_LAB_ENCRYPT'
+          import {readFile,writeFile,mkdir} from "node:fs/promises";
+          import {createCipheriv,randomBytes} from "node:crypto";
+          import {join} from "node:path";
+          const key=process.env.WORK_LAB_PACKAGE_KEY??"";
+          if(!key){console.log("BUILD OK — package key missing; no artifact uploaded.");await writeFile(process.env.GITHUB_OUTPUT,"ready=false\n",{flag:"a"});process.exit(0);}
+          if(!/^[0-9a-fA-F]{64}$/.test(key))throw Error("WORK_LAB_PACKAGE_KEY must be exactly 64 random hexadecimal characters");
+          const plain=await readFile("private-src/dist-work-lab/APRI QUI.html");
+          if(plain.length<1000||plain.length>64*1024*1024)throw Error("Unexpected package size");
+          const iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",Buffer.from(key,"hex"),iv);
+          const ciphertext=Buffer.concat([cipher.update(plain),cipher.final(),cipher.getAuthTag()]);
+          const payload=ciphertext.toString("base64"),nonce=iv.toString("base64");
+          const html=`<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'"><title>WORK LAB — Sblocco locale</title><style>body{font:16px system-ui;max-width:560px;margin:8vh auto;padding:24px;color:#172033}input,button{box-sizing:border-box;font:inherit;padding:12px;width:100%;margin:8px 0}button{background:#18345e;color:white;border:0;border-radius:6px;cursor:pointer}p{line-height:1.5}</style></head><body><h1>PLUS HUB · WORK LAB</h1><p>Inserisci la chiave privata del pacchetto. Lo sblocco avviene localmente nel browser; nessun dato viene inviato online.</p><label for="key">Chiave di 64 caratteri esadecimali</label><input id="key" type="password" autocomplete="off" spellcheck="false"><button id="unlock">Sblocca e salva APRI QUI.html</button><p id="message" role="status"></p><script>const payload="${payload}",nonce="${nonce}";const bytes=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));const input=document.getElementById("key"),button=document.getElementById("unlock"),message=document.getElementById("message");button.onclick=async()=>{button.disabled=true;message.textContent="";try{const k=input.value.trim();if(!/^[0-9a-fA-F]{64}$/.test(k))throw Error("Chiave non valida");if(!globalThis.crypto?.subtle)throw Error("Browser non compatibile");const raw=Uint8Array.from(k.match(/../g),x=>parseInt(x,16));const key=await crypto.subtle.importKey("raw",raw,"AES-GCM",false,["decrypt"]);raw.fill(0);input.value="";const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:bytes(nonce)},key,bytes(payload));const url=URL.createObjectURL(new Blob([plain],{type:"text/html"}));const a=document.createElement("a");a.href=url;a.download="APRI QUI.html";document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);message.textContent="Sblocco completato. Apri il file scaricato con Edge. Solo dati sintetici.";}catch{message.textContent="Sblocco non riuscito: controlla la chiave e le policy del browser.";}finally{button.disabled=false;}};</script></body></html>`;
+          const output=join(process.env.RUNNER_TEMP,"encrypted-work-lab");
+          await mkdir(output,{recursive:true});
+          await writeFile(join(output,"SBLOCCA WORK LAB.html"),html,{flag:"wx"});
+          await writeFile(process.env.GITHUB_OUTPUT,"ready=true\n",{flag:"a"});
+          console.log("PASS: authenticated encrypted package produced.");
+          WORK_LAB_ENCRYPT
+      - name: Upload encrypted wrapper only
+        if: steps.encrypt.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PLUS-HUB-WORK-LAB-ENCRYPTED
+          path: ${{ runner.temp }}/encrypted-work-lab/SBLOCCA WORK LAB.html
+          if-no-files-found: error
+          retention-days: 3
+      - name: Remove plaintext and private build logs
+        if: always()
+        shell: bash
+        run: |
+          rm -rf private-src "$RUNNER_TEMP/work-lab-build.log" "$RUNNER_TEMP/work-lab-npm.log" "$RUNNER_TEMP/encrypted-work-lab"
