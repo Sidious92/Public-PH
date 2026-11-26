@@ -1,6 +1,10 @@
 name: PLUS HUB - Node 26 React TypeScript Vite stack gate
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/plus-hub-stack-node26-react-ts.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -17,7 +21,7 @@ concurrency:
 
 jobs:
   react-stack:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     name: Node 26 + npm 12 + React 19 + TS 7 + Vite 8 synthetic-only
     runs-on: ubuntu-latest
     timeout-minutes: 28
@@ -25,7 +29,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '589a16caccfa26cf0fab30475ac9c3453bc7247e' || inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -36,7 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && '589a16caccfa26cf0fab30475ac9c3453bc7247e' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -64,7 +68,7 @@ jobs:
       - name: Confirm reviewed commit, committed lockfile and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '589a16caccfa26cf0fab30475ac9c3453bc7247e' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -128,7 +132,7 @@ jobs:
           (cd private-src && npm test) > "$RUNNER_TEMP/private-node-tests.log" 2>&1 || result=$?
           # Report only fixed synthetic gate identifiers and bounded numeric
           # counters. Never print arbitrary JSON fields or private source text.
-          node -e 'const fs=require("node:fs");const raw=fs.readFileSync(process.env.RUNNER_TEMP+"/private-node-tests.log","utf8");const gates=new Set(["footer","note-count","handover-count","note","max-note","handover"]);const shifts=new Set(["morning","afternoon","night"]);let n=0;for(const line of raw.split(/\r?\n/)){const m=line.match(/^\s*PDF_QA_METRIC (\{.*\})\s*$/);if(!m||n>=30)continue;try{const x=JSON.parse(m[1]);if(!gates.has(x.gate)||!shifts.has(x.shift))continue;const out={gate:x.gate,shift:x.shift};for(const k of ["page","pages","rawCount","bodyCount","expectedCount","actualLength","expectedLength","prefix"])if(Number.isInteger(x[k])&&x[k]>=0&&x[k]<=1000000)out[k]=x[k];console.log("Sanitized PDF integrity metric: "+JSON.stringify(out));n++}catch{}}'
+          node -e 'const fs=require("node:fs");const raw=fs.readFileSync(process.env.RUNNER_TEMP+"/private-node-tests.log","utf8");const gates=new Set(["footer","note-count","handover-count","note","max-note","handover","handover-width-continuous","handover-width-multiline"]);const shifts=new Set(["morning","afternoon","night"]);let n=0;for(const line of raw.split(/\r?\n/)){const m=line.match(/^\s*PDF_QA_METRIC (\{.*\})\s*$/);if(!m||n>=30)continue;try{const x=JSON.parse(m[1]);if(!gates.has(x.gate)||!shifts.has(x.shift))continue;const out={gate:x.gate,shift:x.shift};for(const k of ["page","pages","rawCount","bodyCount","expectedCount","actualLength","expectedLength","prefix","maxWidth","wideLines","lines","minX","maxX"])if(Number.isInteger(x[k])&&x[k]>=0&&x[k]<=1000000)out[k]=x[k];console.log("Sanitized PDF integrity metric: "+JSON.stringify(out));n++}catch{}}'
           if [ "$result" -eq 0 ]; then
             echo 'PASS: Node 26 complete PLUS-HUB synthetic regression suite.'
           else
