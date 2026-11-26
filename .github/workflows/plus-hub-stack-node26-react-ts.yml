@@ -1,6 +1,10 @@
 name: PLUS HUB - Node 26 React TypeScript Vite stack gate
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/plus-hub-stack-node26-react-ts.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -17,7 +21,7 @@ concurrency:
 
 jobs:
   react-stack:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     name: Node 26 + npm 12 + React 19 + TS 7 + Vite 8 synthetic-only
     runs-on: ubuntu-latest
     timeout-minutes: 28
@@ -25,7 +29,7 @@ jobs:
       - name: Validate pinned private SHA and read-only access
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'd81a240e2c2ef517a7175cbce7fdee7b5e34fa3b' || inputs.source_sha }}
           TOKEN_PRESENT: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -36,7 +40,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && 'd81a240e2c2ef517a7175cbce7fdee7b5e34fa3b' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -64,7 +68,7 @@ jobs:
       - name: Confirm reviewed commit, committed lockfile and React sources
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && 'd81a240e2c2ef517a7175cbce7fdee7b5e34fa3b' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -127,6 +131,25 @@ jobs:
           if (cd private-src && npm test) > "$RUNNER_TEMP/private-node-tests.log" 2>&1; then
             echo 'PASS: Node 26 complete PLUS-HUB synthetic regression suite.'
           else
+            # Only static test-file references from tracked synthetic test paths,
+            # numeric line numbers and numeric summary counts. No assertion text,
+            # runtime values, source excerpts, arbitrary paths or raw logs.
+            node --input-type=module <<'NODE'
+            import {readFileSync} from "node:fs";
+            import {execFileSync} from "node:child_process";
+            const raw=readFileSync(process.env.RUNNER_TEMP+"/private-node-tests.log","utf8");
+            const clean=raw.replace(/\x1b\[[0-9;]*m/g,"");
+            const tracked=new Set(execFileSync("git",["-C","private-src","ls-files","-z","tests"],{encoding:"utf8"}).split("\0").filter(p=>/^tests\/[a-z0-9-]+\/[a-z0-9-]+\.test\.mjs$/.test(p)));
+            const failures=new Map();
+            for(const line of clean.split(/\r?\n/)){
+              const m=line.match(/^\s*(?:test at|location:)\s+(?:file:\/\/\/[^\s]*?\/private-src\/)?(tests\/[a-z0-9-]+\/[a-z0-9-]+\.test\.mjs):(\d{1,6}):(\d{1,6})\s*$/);
+              if(m&&tracked.has(m[1]))failures.set(m[1]+":"+m[2],{suite:m[1].split("/")[1],file:m[1].split("/")[2],line:Number(m[2])});
+            }
+            const counts={};
+            for(const m of clean.matchAll(/^\s*(?:ℹ|#)\s*(tests|pass|fail|skipped|cancelled|todo)\s+(\d{1,6})\s*$/gm))counts[m[1]]=Number(m[2]);
+            console.log("Sanitized test counts: "+JSON.stringify(counts));
+            console.log("Sanitized failed test locations: "+JSON.stringify([...failures.values()].slice(0,40)));
+            NODE
             echo 'FAIL: Node 26 regressions; raw logs withheld.'
             exit 1
           fi
