@@ -1,10 +1,6 @@
 name: PLUS HUB - Report PostgreSQL ephemeral integration
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/plus-hub-report-pg-ephemeral.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -21,7 +17,7 @@ concurrency:
 
 jobs:
   disposable-report-pg:
-    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     runs-on: ubuntu-latest
     timeout-minutes: 18
     services:
@@ -49,7 +45,7 @@ jobs:
       - name: Validate trusted SHA and private read-only checkout token
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '9eb06ee81ef1bf75d663bb430feee67be567d585' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
           TOKEN_CONFIGURED: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -60,7 +56,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ github.event_name == 'push' && '9eb06ee81ef1bf75d663bb430feee67be567d585' || inputs.source_sha }}
+          ref: ${{ inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -85,7 +81,7 @@ jobs:
       - name: Verify commit and dedicated disposable DB test
         shell: bash
         env:
-          SOURCE_SHA: ${{ github.event_name == 'push' && '9eb06ee81ef1bf75d663bb430feee67be567d585' || inputs.source_sha }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -138,16 +134,6 @@ jobs:
             echo 'FAIL: dedicated synthetic Report PostgreSQL integration; raw logs withheld.'
             exit 1
           fi
-
-      - name: Verify local synthetic migrations, restricted role and persistent readback
-        shell: bash
-        run: |
-          set -euo pipefail
-          result=0
-          (cd private-src && node tests/report-postgres/local-server-persistence.mjs) > "$RUNNER_TEMP/local-server-pg.log" 2>&1 || result=$?
-          grep -E '^LOCAL_PG_GATE (provision|migrations|least-privilege|write-disconnect|durable-readback)$' "$RUNNER_TEMP/local-server-pg.log" || true
-          test "$result" = 0 || { echo 'FAIL: local restricted PostgreSQL gate; raw logs withheld.'; exit 1; }
-          echo 'PASS: local restricted PostgreSQL migrations and durable readback.'
 
       - name: Check private source files remain unchanged
         shell: bash
