@@ -1,6 +1,10 @@
 name: PLUS HUB - Report PostgreSQL ephemeral integration
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/plus-hub-report-pg-ephemeral.yml'
   workflow_dispatch:
     inputs:
       source_sha:
@@ -17,7 +21,7 @@ concurrency:
 
 jobs:
   disposable-report-pg:
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
+    if: (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' && github.repository == 'Sidious92/Public-PH'
     runs-on: ubuntu-latest
     timeout-minutes: 18
     services:
@@ -45,7 +49,7 @@ jobs:
       - name: Validate trusted SHA and private read-only checkout token
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '396467a65e17e0c54f8c7ebdb0e7e47d74038c36' || inputs.source_sha }}
           TOKEN_CONFIGURED: ${{ secrets.PUBLIC_PH_READ_TOKEN != '' }}
         run: |
           set -euo pipefail
@@ -56,7 +60,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Sidious92/PLUS-HUB
-          ref: ${{ inputs.source_sha }}
+          ref: ${{ github.event_name == 'push' && '396467a65e17e0c54f8c7ebdb0e7e47d74038c36' || inputs.source_sha }}
           token: ${{ secrets.PUBLIC_PH_READ_TOKEN }}
           persist-credentials: false
           fetch-depth: 1
@@ -81,7 +85,7 @@ jobs:
       - name: Verify commit and dedicated disposable DB test
         shell: bash
         env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
+          SOURCE_SHA: ${{ github.event_name == 'push' && '396467a65e17e0c54f8c7ebdb0e7e47d74038c36' || inputs.source_sha }}
         run: |
           set -euo pipefail
           test "$(git -C private-src rev-parse HEAD)" = "$SOURCE_SHA"
@@ -197,7 +201,7 @@ jobs:
               echo "LOCAL_PG_GATE container-postgres"
               exec /node-runtime/loader --library-path /node-runtime /node-runtime/node tests/local-server/native-pg-lifecycle.mjs
             ' > "$RUNNER_TEMP/native-pg-test.log" 2>&1 || result=$?
-          grep -E '^LOCAL_PG_GATE (container-user|container-source|container-node|container-postgres|native-provision|native-core-provision|native-core-accounts|native-stop|native-pdf-restart|native-gr-app|native-restart)$' "$RUNNER_TEMP/native-pg-test.log" || true
+          grep -E '^LOCAL_PG_GATE (container-user|container-source|container-node|container-postgres|native-provision|native-core-provision|native-core-accounts|native-stop|native-pdf-restart|native-gr-app|native-gr-launcher|native-gr-ready|native-gr-error-(ready|login|read|save|pdf|revocation)-(400|401|403|404|409|503|assertion|other)|native-restart)$' "$RUNNER_TEMP/native-pg-test.log" || true
           # Only predeclared synthetic failure codes. Never expose private paths or data.
           grep -Eo 'LOCAL_PG16_BINARIES_MISSING|LOCAL_PG_BINARY_UNAVAILABLE|LOCAL_PG_TIMEOUT|LOCAL_PG_INIT_FAILED|LOCAL_PG_START_FAILED|LOCAL_PG_STOP_FAILED|LOCAL_PG_RUNTIME_CHECK_FAILED|LOCAL_CLUSTER_IDENTITY_MISMATCH|LOCAL_PG_PORT_OCCUPIED|LOCAL_STATE_REDIRECTED|LOCAL_UNMANAGED_STATE_PRESENT|LOCAL_PROVISION_LOCKED' "$RUNNER_TEMP/native-pg-test.log" | sort -u | head -12 || true
           if [ "$result" != 0 ]; then
